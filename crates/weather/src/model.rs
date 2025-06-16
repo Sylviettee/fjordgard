@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 #[serde(untagged)]
 pub(crate) enum MeteoResponse<T> {
     Success(T),
-    Error { error: bool, reason: String },
+    Error { reason: String },
 }
 
 #[derive(Serialize, Default)]
@@ -19,7 +19,7 @@ pub struct GeocodeOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct GeocodeResult {
+pub struct Location {
     pub id: usize,
     pub name: String,
     pub latitude: f64,
@@ -53,9 +53,8 @@ pub struct GeocodeResult {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct GeocodeResponse {
-    pub results: Vec<GeocodeResult>,
-    pub generationtime_ms: f64,
+pub(crate) struct GeocodeResponse {
+    pub(crate) results: Vec<Location>,
 }
 
 #[derive(strum::Display)]
@@ -295,19 +294,34 @@ pub struct ForecastOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ForecastResponse {
+pub struct ForecastData {
+    pub time: Vec<String>,
+    #[serde(flatten)]
+    pub data: HashMap<String, Vec<f64>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct CurrentData {
+    pub time: String,
+    pub interval: usize,
+    #[serde(flatten)]
+    pub data: HashMap<String, f64>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Forecast {
     pub latitude: f64,
     pub longitude: f64,
     pub elevation: f64,
-    #[serde(rename = "generationtime_ms")]
-    pub generation_time_ms: f64,
     pub utc_offset_seconds: isize,
     pub timezone: String,
     pub timezone_abbreviation: String,
-    pub hourly: Option<HashMap<String, serde_json::Value>>,
+    pub hourly: Option<ForecastData>,
     pub hourly_units: Option<HashMap<String, String>>,
-    pub daily: Option<HashMap<String, serde_json::Value>>,
+    pub daily: Option<ForecastData>,
     pub daily_units: Option<HashMap<String, String>>,
+    pub current: Option<CurrentData>,
+    pub current_units: Option<HashMap<String, String>>,
 }
 
 fn csv<S: Serializer, T: Display>(list: &Option<Vec<T>>, serializer: S) -> Result<S::Ok, S::Error> {

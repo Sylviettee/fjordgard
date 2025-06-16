@@ -59,16 +59,12 @@ impl MeteoClient {
 
         match resp {
             MeteoResponse::Success(s) => Ok(s),
-            MeteoResponse::Error { error: _, reason } => Err(Error::Meteo(reason)),
+            MeteoResponse::Error { reason } => Err(Error::Meteo(reason)),
         }
     }
 
     /// Endpoint: `/search`
-    pub async fn geocode(
-        &self,
-        name: &str,
-        opt: Option<GeocodeOptions>,
-    ) -> Result<Vec<GeocodeResult>> {
+    pub async fn geocode(&self, name: &str, opt: Option<GeocodeOptions>) -> Result<Vec<Location>> {
         let resp: GeocodeResponse = self
             .request(GEOCODING_API_HOST, "search", Some(&[("name", name)]), opt)
             .await?;
@@ -82,7 +78,7 @@ impl MeteoClient {
         latitude: f64,
         longitude: f64,
         opt: Option<ForecastOptions>,
-    ) -> Result<ForecastResponse> {
+    ) -> Result<Forecast> {
         self.request(
             FORECASTING_API_HOST,
             "forecast",
@@ -97,7 +93,7 @@ impl MeteoClient {
 mod tests {
     use super::*;
 
-    async fn get_london(client: &MeteoClient) -> GeocodeResult {
+    async fn get_london(client: &MeteoClient) -> Location {
         let res = client
             .geocode("London, United Kingdom", None)
             .await
@@ -126,7 +122,7 @@ mod tests {
                 london.latitude,
                 london.longitude,
                 Some(ForecastOptions {
-                    hourly: Some(vec![HourlyVariable::Temperature2m]),
+                    current: Some(vec![CurrentVariable::Temperature2m]),
                     ..Default::default()
                 }),
             )
