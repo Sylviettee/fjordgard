@@ -4,8 +4,6 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("meteo error: {0}")]
     Meteo(String),
-    #[error("meteo returned nothing")]
-    MeteoEmpty,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

@@ -9,8 +9,9 @@ use serde::{Serialize, de::DeserializeOwned};
 mod error;
 mod model;
 
-static USER_AGENT: &str = concat!("fjordgard/", env!("CARGO_PKG_VERSION"));
+const USER_AGENT: &str = concat!("fjordgard/", env!("CARGO_PKG_VERSION"));
 const GEOCODING_API_HOST: &str = "geocoding-api.open-meteo.com";
+const FORECASTING_API_HOST: &str = "api.open-meteo.com";
 
 pub struct MeteoClient {
     api_key: Option<String>,
@@ -56,14 +57,9 @@ impl MeteoClient {
 
         let resp: MeteoResponse<T> = req.send().await?.json().await?;
 
-        if resp.error.unwrap_or_default() {
-            return Err(Error::Meteo(resp.reason.unwrap_or_default()));
-        }
-
-        if let Some(res) = resp.results {
-            Ok(res)
-        } else {
-            Err(Error::MeteoEmpty)
+        match resp {
+            MeteoResponse::Success(s) => Ok(s),
+            MeteoResponse::Error { error: _, reason } => Err(Error::Meteo(reason)),
         }
     }
 
@@ -72,16 +68,28 @@ impl MeteoClient {
         &self,
         name: &str,
         opt: Option<GeocodeOptions>,
-    ) -> Result<Vec<GeocodeResponse>> {
-        let resp = self
+    ) -> Result<Vec<GeocodeResult>> {
+        let resp: GeocodeResponse = self
             .request(GEOCODING_API_HOST, "search", Some(&[("name", name)]), opt)
-            .await;
+            .await?;
 
-        match resp {
-            Err(Error::MeteoEmpty) => Ok(vec![]),
-            Err(e) => Err(e),
-            Ok(o) => Ok(o),
-        }
+        Ok(resp.results)
+    }
+
+    /// Endpoint: `/forecast`
+    pub async fn forecast_single(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        opt: Option<ForecastOptions>,
+    ) -> Result<ForecastResponse> {
+        self.request(
+            FORECASTING_API_HOST,
+            "forecast",
+            Some(&[("latitude", latitude), ("longitude", longitude)]),
+            opt,
+        )
+        .await
     }
 }
 
@@ -89,17 +97,40 @@ impl MeteoClient {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn geocode() {
-        let client = MeteoClient::new(None).unwrap();
+    async fn get_london(client: &MeteoClient) -> GeocodeResult {
         let res = client
             .geocode("London, United Kingdom", None)
             .await
             .unwrap();
-        let london = res.get(0).unwrap();
+
+        res.get(0).unwrap().clone()
+    }
+
+    #[tokio::test]
+    async fn geocode() {
+        let client = MeteoClient::new(None).unwrap();
+        let london = get_london(&client).await;
 
         assert_eq!(london.timezone, "Europe/London");
         assert_eq!(london.admin1, Some("England".to_string()));
         assert_eq!(london.country, "United Kingdom");
+    }
+
+    #[tokio::test]
+    async fn forecast_single() {
+        let client = MeteoClient::new(None).unwrap();
+        let london = get_london(&client).await;
+
+        client
+            .forecast_single(
+                london.latitude,
+                london.longitude,
+                Some(ForecastOptions {
+                    hourly: Some(vec![HourlyVariable::Temperature2m]),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap();
     }
 }
