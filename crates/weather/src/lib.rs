@@ -2,12 +2,13 @@ use std::fmt::Debug;
 
 use reqwest::Client;
 
-pub use error::*;
+pub use error::Error;
+use error::Result;
 use model::*;
 use serde::{Serialize, de::DeserializeOwned};
 
 mod error;
-mod model;
+pub mod model;
 
 const USER_AGENT: &str = concat!("fjordgard/", env!("CARGO_PKG_VERSION"));
 const GEOCODING_API_HOST: &str = "geocoding-api.open-meteo.com";

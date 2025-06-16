@@ -58,6 +58,7 @@ pub struct Location {
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct GeocodeResponse {
+    #[serde(default)]
     pub(crate) results: Vec<Location>,
 }
 
