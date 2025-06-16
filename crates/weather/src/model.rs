@@ -1,16 +1,20 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
+use serde_with::DeserializeFromStr;
+use strum::{Display, EnumString};
+
+use crate::Error;
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-pub(crate) enum MeteoResponse<T> {
-    Success(T),
+pub(crate) enum MeteoResponse {
+    Success(serde_json::Value),
     Error { reason: String },
 }
 
+#[serde_with::skip_serializing_none]
 #[derive(Serialize, Default)]
-#[serde(default)]
 pub struct GeocodeOptions {
     pub count: Option<usize>,
     pub language: Option<String>,
@@ -57,7 +61,7 @@ pub(crate) struct GeocodeResponse {
     pub(crate) results: Vec<Location>,
 }
 
-#[derive(strum::Display)]
+#[derive(Display, EnumString, Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum HourlyVariable {
     #[strum(to_string = "temperature_2m")]
@@ -142,9 +146,77 @@ pub enum HourlyVariable {
     IsDay,
     #[strum(to_string = "geopotential_height_{0}hPa")]
     GeopotentialHeightPressureLevel(usize),
+    /// NOTE: Not a valid variable, only found within `.hourly_units`
+    Time,
 }
 
-#[derive(strum::Display)]
+impl<'de> Deserialize<'de> for HourlyVariable {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct HourlyVariableVisitor;
+
+        impl<'de> Visitor<'de> for HourlyVariableVisitor {
+            type Value = HourlyVariable;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a valid hourly variable")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match Self::Value::from_str(v) {
+                    Ok(v) => Ok(v),
+                    Err(e) => {
+                        // temperature_{0}hPa
+                        // relative_humidity_{0}hPa
+                        // dew_point_{0}hPa
+                        // cloud_cover_{0}hPa
+                        // wind_speed_{0}hPa
+                        // wind_direction_{0}hPa
+                        // geopotential_height_{0}hPa
+
+                        if !v.ends_with("hPa") {
+                            return Err(serde::de::Error::custom(e));
+                        }
+
+                        let stripped = v.strip_suffix("hPa").unwrap();
+
+                        let pos = stripped
+                            .find(|c: char| c.is_ascii_digit())
+                            .ok_or(serde::de::Error::custom(Error::InvalidPressureLevel))?;
+
+                        let var = &stripped[..pos];
+                        let num = stripped[pos..]
+                            .parse::<usize>()
+                            .map_err(serde::de::Error::custom)?;
+
+                        let res = match var {
+                            "temperature_" => HourlyVariable::TemperaturePressureLevel(num),
+                            "relative_humidity_" => {
+                                HourlyVariable::RelativeHumidityPressureLevel(num)
+                            }
+                            "dew_point_" => HourlyVariable::DewPointPressureLevel(num),
+                            "cloud_cover_" => HourlyVariable::CloudCoverPressureLevel(num),
+                            "wind_speed_" => HourlyVariable::WindSpeedPressureLevel(num),
+                            "wind_direction_" => HourlyVariable::WindDirectionPressureLevel(num),
+                            "geopotential_height_" => {
+                                HourlyVariable::GeopotentialHeightPressureLevel(num)
+                            }
+                            _ => return Err(serde::de::Error::custom(Error::InvalidPressureLevel)),
+                        };
+
+                        Ok(res)
+                    }
+                }
+            }
+        }
+
+        deserializer.deserialize_str(HourlyVariableVisitor)
+    }
+}
+
+#[derive(Display, EnumString, Clone, Copy, Debug, Hash, PartialEq, Eq, DeserializeFromStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum DailyVariable {
     #[strum(to_string = "temperature_2m_max")]
@@ -179,9 +251,11 @@ pub enum DailyVariable {
     Et0FaoEvapotranspiration,
     UvIndexMax,
     UvIndexClearSkyMax,
+    /// NOTE: Not a valid variable, only found within `.daily_units`
+    Time,
 }
 
-#[derive(strum::Display)]
+#[derive(Display, EnumString, Clone, Copy, Debug, Hash, PartialEq, Eq, DeserializeFromStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum CurrentVariable {
     #[strum(to_string = "temperature_2m")]
@@ -218,6 +292,10 @@ pub enum CurrentVariable {
     WindGusts10m,
     Visibility,
     WeatherCode,
+    /// NOTE: Not a valid variable, only found within `.current_units`
+    Time,
+    /// NOTE: Not a valid variable, only found within `.current_units`
+    Interval,
 }
 
 #[derive(Serialize)]
@@ -262,6 +340,7 @@ pub enum CellSelection {
     Nearest,
 }
 
+#[serde_with::skip_serializing_none]
 #[derive(Serialize, Default)]
 pub struct ForecastOptions {
     pub elevation: Option<f64>,
@@ -294,10 +373,17 @@ pub struct ForecastOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ForecastData {
+pub struct HourlyData {
     pub time: Vec<String>,
     #[serde(flatten)]
-    pub data: HashMap<String, Vec<f64>>,
+    pub data: HashMap<HourlyVariable, Vec<f64>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct DailyData {
+    pub time: Vec<String>,
+    #[serde(flatten)]
+    pub data: HashMap<DailyVariable, Vec<f64>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -305,7 +391,7 @@ pub struct CurrentData {
     pub time: String,
     pub interval: usize,
     #[serde(flatten)]
-    pub data: HashMap<String, f64>,
+    pub data: HashMap<CurrentVariable, f64>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -316,12 +402,12 @@ pub struct Forecast {
     pub utc_offset_seconds: isize,
     pub timezone: String,
     pub timezone_abbreviation: String,
-    pub hourly: Option<ForecastData>,
-    pub hourly_units: Option<HashMap<String, String>>,
-    pub daily: Option<ForecastData>,
-    pub daily_units: Option<HashMap<String, String>>,
+    pub hourly: Option<HourlyData>,
+    pub hourly_units: Option<HashMap<HourlyVariable, String>>,
+    pub daily: Option<DailyData>,
+    pub daily_units: Option<HashMap<DailyVariable, String>>,
     pub current: Option<CurrentData>,
-    pub current_units: Option<HashMap<String, String>>,
+    pub current_units: Option<HashMap<CurrentVariable, String>>,
 }
 
 fn csv<S: Serializer, T: Display>(list: &Option<Vec<T>>, serializer: S) -> Result<S::Ok, S::Error> {

@@ -55,11 +55,14 @@ impl MeteoClient {
             req = req.query(opt)
         };
 
-        let resp: MeteoResponse<T> = req.send().await?.json().await?;
+        let resp: MeteoResponse = req.send().await?.json().await?;
 
         match resp {
-            MeteoResponse::Success(s) => Ok(s),
             MeteoResponse::Error { reason } => Err(Error::Meteo(reason)),
+            MeteoResponse::Success(v) => match serde_json::from_value(v) {
+                Ok(o) => Ok(o),
+                Err(e) => Err(Error::SerdeJson(e)),
+            },
         }
     }
 
@@ -123,6 +126,11 @@ mod tests {
                 london.longitude,
                 Some(ForecastOptions {
                     current: Some(vec![CurrentVariable::Temperature2m]),
+                    daily: Some(vec![DailyVariable::Temperature2mMean]),
+                    hourly: Some(vec![
+                        HourlyVariable::Temperature2m,
+                        HourlyVariable::TemperaturePressureLevel(1000),
+                    ]),
                     ..Default::default()
                 }),
             )
