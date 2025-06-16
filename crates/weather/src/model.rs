@@ -10,10 +10,10 @@ pub(crate) struct MeteoResponse<T> {
 #[derive(Serialize)]
 #[serde(default)]
 pub struct GeocodeOptions {
-    count: Option<usize>,
-    language: Option<String>,
-    api_key: Option<String>,
-    country_code: Option<String>,
+    pub count: Option<usize>,
+    pub language: Option<String>,
+    pub api_key: Option<String>,
+    pub country_code: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
