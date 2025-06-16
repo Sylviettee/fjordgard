@@ -1,0 +1,12 @@
+[workspace]
+members = [
+  "crates/weather",
+  "crates/unsplash"
+]
+
+[package]
+name = "fjordgard"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
