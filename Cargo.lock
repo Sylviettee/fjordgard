@@ -231,6 +231,12 @@ dependencies = [
 [[package]]
 name = "fjordgard-unsplash"
 version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "fjordgard-weather"
