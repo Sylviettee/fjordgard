@@ -41,7 +41,7 @@ impl UnsplashClient {
         &self,
         route: &str,
         query: Option<Q>,
-    ) -> Result<T> {
+    ) -> Result<(T, HeaderMap)> {
         let mut req = self.client.get(format!("{UNSPLASH_API_HOST}/{route}"));
 
         if let Some(ref query) = query {
@@ -54,12 +54,13 @@ impl UnsplashClient {
             return Err(Error::InvalidAPIKey);
         }
 
+        let headers = res.headers().clone();
         let body: UnsplashResponse = res.json().await?;
 
         match body {
             UnsplashResponse::Error { errors } => Err(Error::Unsplash(errors.join(", "))),
             UnsplashResponse::Success(v) => match serde_json::from_value(v) {
-                Ok(o) => Ok(o),
+                Ok(o) => Ok((o, headers)),
                 Err(e) => Err(Error::SerdeJson(e)),
             },
         }
@@ -70,8 +71,28 @@ impl UnsplashClient {
         &self,
         id: &str,
         opt: Option<CollectionPhotosOptions>,
-    ) -> Result<Vec<Photo>> {
-        self.request(&format!("collections/{id}/photos"), opt).await
+    ) -> Result<CollectionPhotos> {
+        let (photos, headers) = self
+            .request(&format!("collections/{id}/photos"), opt)
+            .await?;
+
+        Ok(CollectionPhotos {
+            collection_total: headers
+                .get("X-Total")
+                .ok_or(Error::MissingHeader("X-Total"))?
+                .to_str()
+                .map_err(|_| Error::MalformedResponse)?
+                .parse::<usize>()
+                .map_err(|_| Error::MalformedResponse)?,
+            per_page: headers
+                .get("X-Per-Page")
+                .ok_or(Error::MissingHeader("X-Per-Page"))?
+                .to_str()
+                .map_err(|_| Error::MalformedResponse)?
+                .parse::<usize>()
+                .map_err(|_| Error::MalformedResponse)?,
+            photos,
+        })
     }
 }
 
@@ -88,7 +109,17 @@ mod tests {
     #[tokio::test]
     async fn collection_photos() {
         let client = UnsplashClient::new(&api_key()).unwrap();
+        let collection = client
+            .collection_photos(
+                "1053828",
+                Some(CollectionPhotosOptions {
+                    per_page: Some(5),
+                    ..Default::default()
+                }),
+            )
+            .await
+            .unwrap();
 
-        client.collection_photos("1053828", None).await.unwrap();
+        assert_eq!(collection.per_page, 5);
     }
 }

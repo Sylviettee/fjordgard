@@ -26,6 +26,13 @@ pub struct CollectionPhotosOptions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct CollectionPhotos {
+    pub collection_total: usize,
+    pub per_page: usize,
+    pub photos: Vec<Photo>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Photo {
     pub id: String,
     pub slug: String,
