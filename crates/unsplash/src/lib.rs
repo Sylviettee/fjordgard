@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 
 use reqwest::{
-    header::{self, HeaderMap, HeaderValue}, Client, StatusCode
+    Client, StatusCode,
+    header::{self, HeaderMap, HeaderValue},
 };
 
 pub use error::Error;
@@ -50,7 +51,7 @@ impl UnsplashClient {
         let res = req.send().await?;
 
         if res.status() == StatusCode::UNAUTHORIZED {
-            return Err(Error::InvalidAPIKey)
+            return Err(Error::InvalidAPIKey);
         }
 
         let body: UnsplashResponse = res.json().await?;
@@ -59,8 +60,35 @@ impl UnsplashClient {
             UnsplashResponse::Error { errors } => Err(Error::Unsplash(errors.join(", "))),
             UnsplashResponse::Success(v) => match serde_json::from_value(v) {
                 Ok(o) => Ok(o),
-                Err(e) => Err(Error::SerdeJson(e))
-            }
+                Err(e) => Err(Error::SerdeJson(e)),
+            },
         }
+    }
+
+    // Endpoint: `/collections/:id/photos`
+    pub async fn collection_photos(
+        &self,
+        id: &str,
+        opt: Option<CollectionPhotosOptions>,
+    ) -> Result<Vec<Photo>> {
+        self.request(&format!("collections/{id}/photos"), opt).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+
+    fn api_key() -> String {
+        env::var("UNSPLASH_KEY").expect("expected env:UNSPLASH_KEY")
+    }
+
+    #[tokio::test]
+    async fn collection_photos() {
+        let client = UnsplashClient::new(&api_key()).unwrap();
+
+        client.collection_photos("1053828", None).await.unwrap();
     }
 }
