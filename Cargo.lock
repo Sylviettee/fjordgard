@@ -1137,6 +1137,7 @@ dependencies = [
  "chrono",
  "fjordgard-weather",
  "iced",
+ "strum",
  "tokio",
 ]
 
