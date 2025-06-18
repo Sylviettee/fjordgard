@@ -15,7 +15,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             timezone: String::from("Etc/UTC"),
-            time_format: String::from("%-I:%-M"),
+            time_format: String::from("%-I:%M:%S"),
             // https://unsplash.com/collections/1053828/tabliss-official
             collection: String::from("1053828"),
             location: None
