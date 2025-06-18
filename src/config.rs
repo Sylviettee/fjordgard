@@ -1,7 +1,7 @@
 pub struct Location {
     pub longitude: f64,
     pub latitude: f64,
-    pub name: Option<String>
+    pub name: Option<String>,
 }
 
 pub struct Config {
@@ -18,7 +18,7 @@ impl Default for Config {
             time_format: String::from("%-I:%M:%S"),
             // https://unsplash.com/collections/1053828/tabliss-official
             collection: String::from("1053828"),
-            location: None
+            location: None,
         }
     }
 }

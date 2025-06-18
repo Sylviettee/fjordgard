@@ -12,5 +12,5 @@ edition = "2024"
 [dependencies]
 chrono = "0.4.41"
 fjordgard-weather = { version = "0.1.0", path = "crates/weather" }
-iced = { version = "0.13.1", features = ["tokio"] }
+iced = { version = "0.13.1", features = ["tokio", "canvas", "image", "svg"] }
 tokio = { version = "1.45.1", features = ["full"] }
