@@ -8,7 +8,7 @@ use iced::{
 use rfd::{AsyncFileDialog, FileHandle};
 use strum::VariantArray;
 
-use crate::config::{BackgroundMode, Config};
+use crate::config::{self, BackgroundMode, Config};
 
 #[derive(Debug, Clone, PartialEq, strum::Display, strum::VariantArray)]
 pub enum WeatherLocation {
@@ -57,9 +57,9 @@ pub enum Message {
     LocationSelected(LocationRow),
     Latitude(String),
     Longitude(String),
-    Save,
     FileSelector,
     FileSelected(Option<FileHandle>),
+    Save,
 }
 
 impl Settings {
@@ -206,7 +206,32 @@ impl Settings {
 
                 Task::none()
             }
-            _ => Task::none(),
+            Message::Save => {
+                // TODO; this should also commit to a file
+                let mut config = self.config.borrow_mut();
+
+                config.time_format = self.time_format.clone();
+                config.background_mode = self.background_mode.clone();
+                config.background = self.background.clone();
+
+                match self.location {
+                    WeatherLocation::Disabled => config.location = None,
+                    _ => {
+                        config.location = Some(config::Location {
+                            // this *should* be safe if we're at this point
+                            longitude: self.longitude.parse().unwrap(),
+                            latitude: self.latitude.parse().unwrap(),
+                            name: if self.location == WeatherLocation::LocationName {
+                                Some(self.name.clone())
+                            } else {
+                                None
+                            },
+                        })
+                    }
+                }
+
+                Task::none()
+            }
         }
     }
 
