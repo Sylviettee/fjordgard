@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, strum::Display, strum::VariantArray)]
+#[derive(Debug, Clone, Copy, PartialEq, strum::Display, strum::VariantArray)]
 pub enum BackgroundMode {
     Unsplash,
     Solid,
@@ -10,7 +10,7 @@ impl BackgroundMode {
         match self {
             // https://unsplash.com/collections/1053828/tabliss-official
             Self::Unsplash => "1053828",
-            Self::Solid => "#ffffff",
+            Self::Solid => "#000000",
             Self::Local => "",
         }
     }
@@ -43,8 +43,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             time_format: String::from("%-I:%M:%S"),
-            background_mode: BackgroundMode::Unsplash,
-            background: BackgroundMode::Unsplash.default_background().to_string(),
+            background_mode: BackgroundMode::Solid,
+            background: BackgroundMode::Solid.default_background().to_string(),
             location: None,
         }
     }

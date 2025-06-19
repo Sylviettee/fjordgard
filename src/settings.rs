@@ -60,6 +60,8 @@ pub enum Message {
     FileSelector,
     FileSelected(Option<FileHandle>),
     Save,
+
+    Committed,
 }
 
 impl Settings {
@@ -229,8 +231,9 @@ impl Settings {
                     }
                 }
 
-                Task::none()
+                Task::done(Message::Committed)
             }
+            _ => Task::none(),
         }
     }
 

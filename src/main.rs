@@ -13,9 +13,11 @@ use iced::{
     window,
 };
 
-use background::{BackgroundKind, background};
+use background::BackgroundHandle;
 use config::Config;
 use icon::{icon, icon_button};
+
+use crate::config::BackgroundMode;
 
 mod background;
 mod config;
@@ -26,7 +28,7 @@ struct Fjordgard {
     config: Rc<RefCell<Config>>,
     meteo: Arc<MeteoClient>,
     time: DateTime<Local>,
-    background: BackgroundKind,
+    background: BackgroundHandle,
     format_string: String,
     format_parsed: Vec<Item<'static>>,
 
@@ -47,11 +49,12 @@ enum Message {
     Media(MediaControl),
     OpenSettings,
 
-    SettingsOpened(window::Id),
+    SettingsOpened,
     MainWindowOpened,
     WindowClosed(window::Id),
 
     Settings(settings::Message),
+    Background(background::Message),
 }
 
 impl Fjordgard {
@@ -65,20 +68,24 @@ impl Fjordgard {
             .unwrap();
 
         let meteo = MeteoClient::new(None).unwrap();
+        let (background, task) = BackgroundHandle::new(&config);
 
         (
             Self {
                 config: Rc::new(RefCell::new(config)),
                 meteo: Arc::new(meteo),
                 time: Local::now(),
-                background: BackgroundKind::Color(Color::from_rgb8(255, 255, 255)),
+                background,
                 format_string,
                 format_parsed,
 
                 settings_window: None,
                 main_window: id,
             },
-            open.map(|_| Message::MainWindowOpened),
+            Task::batch(vec![
+                open.map(|_| Message::MainWindowOpened),
+                task.map(Message::Background),
+            ]),
         )
     }
 
@@ -95,15 +102,6 @@ impl Fjordgard {
             Message::Tick(time) => {
                 self.time = time;
 
-                let config_format = &self.config.borrow().time_format;
-
-                if &self.format_string != config_format {
-                    self.format_string = config_format.clone();
-                    self.format_parsed = StrftimeItems::new_lenient(config_format)
-                        .parse_to_owned()
-                        .unwrap();
-                }
-
                 Task::none()
             }
             Message::OpenSettings => {
@@ -119,7 +117,7 @@ impl Fjordgard {
                         self.meteo.clone(),
                     ));
 
-                    open.map(Message::SettingsOpened)
+                    open.map(|_| Message::SettingsOpened)
                 } else {
                     Task::none()
                 }
@@ -132,6 +130,21 @@ impl Fjordgard {
                     Task::none()
                 }
             }
+            Message::Settings(settings::Message::Committed) => {
+                let config = self.config.borrow();
+                let config_format = &config.time_format;
+
+                if &self.format_string != config_format {
+                    self.format_string = config_format.clone();
+                    self.format_parsed = StrftimeItems::new_lenient(config_format)
+                        .parse_to_owned()
+                        .unwrap();
+                }
+
+                self.background
+                    .load_config(&config)
+                    .map(Message::Background)
+            }
             Message::Settings(msg) => {
                 if let Some(settings) = &mut self.settings_window {
                     settings.update(msg).map(Message::Settings)
@@ -139,6 +152,7 @@ impl Fjordgard {
                     Task::none()
                 }
             }
+            Message::Background(msg) => self.background.update(msg).map(Message::Background),
             _ => Task::none(),
         }
     }
@@ -163,36 +177,38 @@ impl Fjordgard {
         let time_widget = text(time_text.to_string())
             .size(100)
             .font(bold)
+            .color(Color::WHITE)
             .width(Length::Fill)
             .center();
 
         let weather_widget = container(row![
             icon("icons/weather/not-available.svg"),
             horizontal_space().width(Length::Fixed(7.25)),
-            text("Weather unknown")
+            text("Weather unknown").color(Color::WHITE)
         ])
-        .center_x(Length::Fill);
-
-        let control = container(
-            row![
-                icon_button("icons/previous.svg", Message::Media(MediaControl::Previous)),
-                icon_button("icons/pause.svg", Message::Media(MediaControl::Pause)),
-                icon_button("icons/next.svg", Message::Media(MediaControl::Next)),
-            ]
-            .spacing(5),
-        )
         .center_x(Length::Fill);
 
         let settings = icon_button("icons/settings.svg", Message::OpenSettings);
 
+        let mut main_column = column![settings, center(column![time_widget, weather_widget])];
+
+        if self.background.mode == BackgroundMode::Unsplash {
+            main_column = main_column.push(
+                container(
+                    row![
+                        icon_button("icons/previous.svg", Message::Media(MediaControl::Previous)),
+                        icon_button("icons/pause.svg", Message::Media(MediaControl::Pause)),
+                        icon_button("icons/next.svg", Message::Media(MediaControl::Next)),
+                    ]
+                    .spacing(5),
+                )
+                .center_x(Length::Fill),
+            )
+        }
+
         stack![
-            background(&self.background),
-            container(column![
-                settings,
-                center(column![time_widget, weather_widget]),
-                control
-            ])
-            .padding(15)
+            self.background.view().map(Message::Background),
+            container(main_column).padding(15)
         ]
         .height(Length::Fill)
         .width(Length::Fill)
