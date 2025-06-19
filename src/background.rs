@@ -2,6 +2,7 @@ use iced::{
     Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme, mouse,
     widget::{canvas, container, image, stack, text},
 };
+use log::{debug, error};
 use tokio::fs;
 
 use crate::config::{BackgroundMode, Config};
@@ -64,6 +65,8 @@ impl BackgroundHandle {
     }
 
     fn refresh(&mut self) -> Task<Message> {
+        debug!("refreshing background (mode={}, background={})", self.mode, &self.background);
+
         match self.mode {
             BackgroundMode::Local => {
                 let path = self.background.clone();
@@ -78,8 +81,10 @@ impl BackgroundHandle {
     pub fn update(&mut self, msg: Message) -> Task<Message> {
         match msg {
             Message::BackgroundRead(res) => match res {
-                // TODO; log error
-                Err(_) => Task::none(),
+                Err(e) => {
+                    error!("failed to load image: {e}");
+                    Task::none()
+                },
                 Ok(bytes) => {
                     self.image_handle = Some(image::Handle::from_bytes(bytes));
                     Task::none()

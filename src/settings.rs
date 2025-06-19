@@ -5,6 +5,7 @@ use iced::{
     Background, Border, Color, Element, Length, Task, Theme,
     widget::{button, column, combo_box, container, row, scrollable, text, text_input, tooltip},
 };
+use log::error;
 use rfd::{AsyncFileDialog, FileHandle};
 use strum::VariantArray;
 
@@ -145,8 +146,9 @@ impl Settings {
             }
             Message::Geocode(locations) => {
                 match locations {
-                    Err(s) => {
-                        self.location_fetch_error = Some(s);
+                    Err(e) => {
+                        error!("failed to fetch geocode: {e}");
+                        self.location_fetch_error = Some(e);
                     }
                     Ok(res) => {
                         self.location_results = res

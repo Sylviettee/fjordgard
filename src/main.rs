@@ -16,6 +16,7 @@ use iced::{
 use background::BackgroundHandle;
 use config::Config;
 use icon::{icon, icon_button};
+use log::debug;
 
 use crate::config::BackgroundMode;
 
@@ -153,6 +154,14 @@ impl Fjordgard {
                 }
             }
             Message::Background(msg) => self.background.update(msg).map(Message::Background),
+            Message::SettingsOpened => {
+                debug!("settings window opened");
+                Task::none()
+            },
+            Message::MainWindowOpened => {
+                debug!("main window opened");
+                Task::none()
+            }
             _ => Task::none(),
         }
     }
@@ -224,6 +233,8 @@ impl Fjordgard {
 }
 
 fn main() -> iced::Result {
+    env_logger::init();
+
     iced::daemon(Fjordgard::title, Fjordgard::update, Fjordgard::view)
         .subscription(Fjordgard::subscription)
         .run_with(Fjordgard::new)
