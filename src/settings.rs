@@ -7,12 +7,13 @@ use iced::{
     },
     window,
 };
+use rfd::{AsyncFileDialog, FileHandle};
 use strum::VariantArray;
 
 use crate::config::{BackgroundMode, Config};
 
 #[derive(Debug, Clone, PartialEq, strum::Display, strum::VariantArray)]
-enum WeatherLocation {
+pub enum WeatherLocation {
     Disabled,
     #[strum(to_string = "Location name")]
     LocationName,
@@ -26,10 +27,10 @@ pub struct Location {
 }
 
 pub struct Settings {
-    pub id: window::Id,
     config: Rc<RefCell<Config>>,
     backgrounds: combo_box::State<BackgroundMode>,
     locations: combo_box::State<WeatherLocation>,
+    file_selector_open: bool,
 
     time_format: String,
     background_mode: BackgroundMode,
@@ -55,10 +56,11 @@ pub enum Message {
     Longitude(String),
     Save,
     FileSelector,
+    FileSelected(Option<FileHandle>),
 }
 
 impl Settings {
-    pub fn new(id: window::Id, config: Rc<RefCell<Config>>) -> Self {
+    pub fn new(config: Rc<RefCell<Config>>) -> Self {
         let original_config = config.borrow().clone();
         let location = original_config.location;
 
@@ -86,10 +88,10 @@ impl Settings {
             .unwrap_or(WeatherLocation::Disabled);
 
         Self {
-            id,
             config,
             backgrounds: combo_box::State::new(BackgroundMode::VARIANTS.to_vec()),
             locations: combo_box::State::new(WeatherLocation::VARIANTS.to_vec()),
+            file_selector_open: false,
 
             time_format: original_config.time_format,
             background_mode: original_config.background_mode,
@@ -133,6 +135,28 @@ impl Settings {
             }
             Message::Longitude(longitude) => {
                 self.longitude = longitude;
+                Task::none()
+            }
+            Message::FileSelector => {
+                if self.file_selector_open {
+                    return Task::none();
+                }
+
+                self.file_selector_open = true;
+
+                let file_task = AsyncFileDialog::new()
+                    .add_filter("image", &["png", "jpeg", "jpg"])
+                    .pick_file();
+
+                Task::future(file_task).map(Message::FileSelected)
+            }
+            Message::FileSelected(file) => {
+                self.file_selector_open = false;
+
+                if let Some(file) = file {
+                    self.background = file.path().to_string_lossy().to_string();
+                }
+
                 Task::none()
             }
             _ => Task::none(),

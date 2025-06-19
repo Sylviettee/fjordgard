@@ -103,13 +103,13 @@ impl Fjordgard {
             }
             Message::OpenSettings => {
                 if self.settings_window.is_none() {
-                    let (id, open) = window::open(window::Settings {
+                    let (_id, open) = window::open(window::Settings {
                         level: window::Level::AlwaysOnTop,
                         size: Size::new(350.0, 450.0),
                         ..Default::default()
                     });
 
-                    self.settings_window = Some(settings::Settings::new(id, self.config.clone()));
+                    self.settings_window = Some(settings::Settings::new(self.config.clone()));
 
                     open.map(Message::SettingsOpened)
                 } else {
