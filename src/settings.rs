@@ -278,6 +278,7 @@ impl Settings {
 
         if self.background_mode == BackgroundMode::Local {
             let text = if self.background.is_empty() {
+                save_message = None;
                 "Select file..."
             } else {
                 &self.background

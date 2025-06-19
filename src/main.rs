@@ -157,7 +157,7 @@ impl Fjordgard {
             Message::SettingsOpened => {
                 debug!("settings window opened");
                 Task::none()
-            },
+            }
             Message::MainWindowOpened => {
                 debug!("main window opened");
                 Task::none()

@@ -65,7 +65,10 @@ impl BackgroundHandle {
     }
 
     fn refresh(&mut self) -> Task<Message> {
-        debug!("refreshing background (mode={}, background={})", self.mode, &self.background);
+        debug!(
+            "refreshing background (mode={}, background={})",
+            self.mode, &self.background
+        );
 
         match self.mode {
             BackgroundMode::Local => {
@@ -84,7 +87,7 @@ impl BackgroundHandle {
                 Err(e) => {
                     error!("failed to load image: {e}");
                     Task::none()
-                },
+                }
                 Ok(bytes) => {
                     self.image_handle = Some(image::Handle::from_bytes(bytes));
                     Task::none()
