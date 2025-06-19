@@ -95,7 +95,7 @@ impl Fjordgard {
 
                 forecast_loaded: false,
                 forecast_text: String::from("Weather unknown"),
-                forecast_icon: String::from("icons/weather/not-available.svg"),
+                forecast_icon: String::from("icons/weather/100-0.svg"),
             },
             Task::batch([
                 open.map(|_| Message::MainWindowOpened),
@@ -187,7 +187,7 @@ impl Fjordgard {
                 let config = self.config.borrow();
                 if let Some(location) = &config.location {
                     let meteo = self.meteo.clone();
-                    let (latitude, longitude) = (location.latitude, location.latitude);
+                    let (latitude, longitude) = (location.latitude, location.longitude);
 
                     Task::future(async move {
                         meteo
@@ -197,10 +197,8 @@ impl Fjordgard {
                                 Some(ForecastOptions {
                                     current: Some(vec![
                                         CurrentVariable::Temperature2m,
-                                        CurrentVariable::Rain,
-                                        CurrentVariable::Snowfall,
                                         CurrentVariable::IsDay,
-                                        CurrentVariable::CloudCover,
+                                        CurrentVariable::WeatherCode,
                                     ]),
                                     ..Default::default()
                                 }),
@@ -218,21 +216,87 @@ impl Fjordgard {
                     Task::none()
                 }
                 Ok(forecast) => {
-                    let forecast_text = || -> Option<String> {
+                    let forecast = || -> Option<(String, String)> {
                         let current = forecast.current?;
                         let units = forecast.current_units?;
 
                         let temperature = current.data.get(&CurrentVariable::Temperature2m)?;
                         let temperature_units = units.get(&CurrentVariable::Temperature2m)?;
 
-                        // TODO; calculate descriptor string
+                        let is_day = *current.data.get(&CurrentVariable::IsDay)? as u64;
+                        let weather_code = *current.data.get(&CurrentVariable::WeatherCode)? as u64;
+
+                        let condition_text = match weather_code {
+                            0 => {
+                                if is_day == 0 {
+                                    "Clear"
+                                } else {
+                                    "Sunny"
+                                }
+                            }
+                            1 => {
+                                if is_day == 0 {
+                                    "Mainly clear"
+                                } else {
+                                    "Mainly sunny"
+                                }
+                            }
+                            2 => "Partly cloudy",
+                            3 => "Overcast",
+                            45 => "Foggy",
+                            48 => "Rime fog",
+                            51 => "Light drizzle",
+                            53 => "Drizzle",
+                            55 => "Heavy drizzle",
+                            56 => "Light freezing drizzle",
+                            57 => "Freezing drizzle",
+                            61 => "Light rain",
+                            63 => "Rain",
+                            65 => "Heavy rain",
+                            66 => "Light freezing rain",
+                            67 => "Freezing rain",
+                            71 => "Light snow",
+                            73 => "Snow",
+                            75 => "Heavy snow",
+                            77 => "Snow grains",
+                            80 => "Light showers",
+                            81 => "Showers",
+                            82 => "Heavy showers",
+                            85 => "Light snow showers",
+                            86 => "Snow showers",
+                            95 => "Thunderstorm",
+                            96 => "Light thunderstorm with hail",
+                            99 => "Thunderstorm with hail",
+                            _ => "Unknown",
+                        };
+
+                        let icon_condition = match weather_code {
+                            0 => 0,
+                            1 => 1,
+                            2 => 2,
+                            3 => 3,
+                            45 | 48 => 45,
+                            51 | 53 | 55 | 56 | 57 => 51,
+                            61 | 63 | 65 | 66 | 67 => 61,
+                            71 | 73 | 75 => 71,
+                            77 => 77,
+                            80 | 81 | 82 | 85 | 86 => 80,
+                            95 => 95,
+                            96 | 99 => 96,
+                            _ => 100,
+                        };
+
                         // TODO; calculate icon
-                        Some(format!("{temperature}{temperature_units}"))
+                        Some((
+                            format!("{temperature}{temperature_units} {condition_text}"),
+                            format!("icons/weather/{icon_condition}-{is_day}.svg"),
+                        ))
                     };
 
-                    if let Some(forecast_text) = forecast_text() {
+                    if let Some((forecast_text, forecast_icon)) = forecast() {
                         self.forecast_loaded = true;
                         self.forecast_text = forecast_text;
+                        self.forecast_icon = forecast_icon;
                     }
 
                     Task::none()
