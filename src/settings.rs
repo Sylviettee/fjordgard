@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use iced::{
-    Element, Length, Task,
+    Background, Border, Color, Element, Length, Task, Theme,
     widget::{
         button, column, combo_box, container, row, scrollable, text, text_input, vertical_space,
     },
@@ -106,8 +106,8 @@ impl Settings {
 
     pub fn update(&mut self, msg: Message) -> Task<Message> {
         match msg {
-            Message::Location(location) => {
-                self.location = location;
+            Message::TimeFormat(format) => {
+                self.time_format = format;
                 Task::none()
             }
             Message::BackgroundMode(mode) => {
@@ -115,11 +115,64 @@ impl Settings {
                 self.background_mode = mode;
                 Task::none()
             }
+            Message::Background(background) => {
+                self.background = background;
+                Task::none()
+            }
+            Message::Location(location) => {
+                self.location = location;
+                Task::none()
+            }
+            Message::Name(name) => {
+                self.name = name;
+                Task::none()
+            }
+            Message::Latitude(latitude) => {
+                self.latitude = latitude;
+                Task::none()
+            }
+            Message::Longitude(longitude) => {
+                self.longitude = longitude;
+                Task::none()
+            }
             _ => Task::none(),
         }
     }
 
     pub fn view(&self) -> Element<Message> {
+        let (latitude, longitude, name) = match self.location {
+            WeatherLocation::Disabled => (None, None, None),
+            WeatherLocation::LocationName => (None, None, Some(Message::Name)),
+            WeatherLocation::Coordinates => {
+                (Some(Message::Latitude), Some(Message::Longitude), None)
+            }
+        };
+
+        let mut save_message = Some(Message::Save);
+
+        let color_style = if self.background_mode == BackgroundMode::Solid
+            && Color::parse(&self.background).is_none()
+        {
+            save_message = None;
+            text_input_error
+        } else {
+            text_input::default
+        };
+
+        let latitude_style = if self.latitude.parse::<f64>().is_ok() || latitude.is_none() {
+            text_input::default
+        } else {
+            save_message = None;
+            text_input_error
+        };
+
+        let longitude_style = if self.longitude.parse::<f64>().is_ok() || longitude.is_none() {
+            text_input::default
+        } else {
+            save_message = None;
+            text_input_error
+        };
+
         let mut background_mode_row =
             row![text(self.background_mode.edit_text()).width(Length::FillPortion(1))];
 
@@ -139,17 +192,10 @@ impl Settings {
             background_mode_row = background_mode_row.push(
                 text_input(self.background_mode.default_background(), &self.background)
                     .on_input(Message::Background)
-                    .width(Length::FillPortion(2)),
+                    .width(Length::FillPortion(2))
+                    .style(color_style),
             );
         }
-
-        let (latitude, longitude, name) = match self.location {
-            WeatherLocation::Disabled => (None, None, None),
-            WeatherLocation::LocationName => (None, None, Some(Message::Name)),
-            WeatherLocation::Coordinates => {
-                (Some(Message::Latitude), Some(Message::Longitude), None)
-            }
-        };
 
         let mut results = column![];
 
@@ -193,12 +239,14 @@ impl Settings {
                         text_input("", &self.latitude)
                             .width(Length::FillPortion(2))
                             .on_input_maybe(latitude)
+                            .style(latitude_style)
                     ],
                     row![
                         text("Longitude").width(Length::FillPortion(1)),
                         text_input("", &self.longitude)
                             .width(Length::FillPortion(2))
                             .on_input_maybe(longitude)
+                            .style(longitude_style)
                     ],
                     row![
                         text("Location").width(Length::FillPortion(1)),
@@ -211,12 +259,52 @@ impl Settings {
                             64.0 * (self.location_results.len().clamp(0, 1) as f32)
                         ))
                         .width(Length::Fill),
-                    button("Save").on_press(Message::Save)
+                    button("Save").on_press_maybe(save_message)
                 ]
                 .spacing(10),
             )
             .padding(15),
         )
         .into()
+    }
+}
+
+fn text_input_error(theme: &Theme, status: text_input::Status) -> text_input::Style {
+    let palette = theme.extended_palette();
+
+    let active = text_input::Style {
+        background: Background::Color(palette.danger.weak.color),
+        border: Border {
+            radius: 2.0.into(),
+            width: 1.0,
+            color: palette.danger.strong.color,
+        },
+        icon: palette.danger.weak.text,
+        placeholder: palette.danger.strong.color,
+        value: palette.danger.weak.text,
+        selection: palette.danger.strong.color,
+    };
+
+    match status {
+        text_input::Status::Active => active,
+        text_input::Status::Hovered => text_input::Style {
+            border: Border {
+                color: palette.danger.base.text,
+                ..active.border
+            },
+            ..active
+        },
+        text_input::Status::Focused => text_input::Style {
+            border: Border {
+                color: palette.background.strong.color,
+                ..active.border
+            },
+            ..active
+        },
+        text_input::Status::Disabled => text_input::Style {
+            background: Background::Color(palette.danger.weak.color),
+            value: active.placeholder,
+            ..active
+        },
     }
 }

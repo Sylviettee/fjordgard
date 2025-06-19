@@ -1,21 +1,20 @@
 use std::{cell::RefCell, rc::Rc};
 
-use chrono::{DateTime, Local};
+use chrono::{
+    DateTime, Local,
+    format::{Item, StrftimeItems},
+};
 use iced::{
     Color, Element, Font, Length, Size, Subscription, Task,
     font::Weight,
     time,
-    widget::{
-        button, center, column, combo_box, container, horizontal_space, row, stack, text,
-        text_input,
-    },
+    widget::{center, column, container, horizontal_space, row, stack, text},
     window,
 };
 
 use background::{BackgroundKind, background};
-use config::{BackgroundMode, Config};
+use config::Config;
 use icon::{icon, icon_button};
-use strum::VariantArray;
 
 mod background;
 mod config;
@@ -26,6 +25,8 @@ struct Fjordgard {
     config: Rc<RefCell<Config>>,
     time: DateTime<Local>,
     background: BackgroundKind,
+    format_string: String,
+    format_parsed: Vec<Item<'static>>,
 
     settings_window: Option<settings::Settings>,
     main_window: window::Id,
@@ -54,12 +55,20 @@ enum Message {
 impl Fjordgard {
     fn new() -> (Self, Task<Message>) {
         let (id, open) = window::open(window::Settings::default());
+        let config = Config::default();
+
+        let format_string = config.time_format.clone();
+        let format_parsed = StrftimeItems::new_lenient(&format_string)
+            .parse_to_owned()
+            .unwrap();
 
         (
             Self {
-                config: Rc::new(RefCell::new(Config::default())),
+                config: Rc::new(RefCell::new(config)),
                 time: Local::now(),
                 background: BackgroundKind::Color(Color::from_rgb8(255, 255, 255)),
+                format_string,
+                format_parsed,
 
                 settings_window: None,
                 main_window: id,
@@ -67,6 +76,7 @@ impl Fjordgard {
             open.map(|_| Message::MainWindowOpened),
         )
     }
+
     fn title(&self, window_id: window::Id) -> String {
         if window_id == self.main_window {
             String::from("Fjordgard")
@@ -79,6 +89,16 @@ impl Fjordgard {
         match msg {
             Message::Tick(time) => {
                 self.time = time;
+
+                let config_format = &self.config.borrow().time_format;
+
+                if &self.format_string != config_format {
+                    self.format_string = config_format.clone();
+                    self.format_parsed = StrftimeItems::new_lenient(&config_format)
+                        .parse_to_owned()
+                        .unwrap();
+                }
+
                 Task::none()
             }
             Message::OpenSettings => {
@@ -128,18 +148,11 @@ impl Fjordgard {
     }
 
     fn view_main(&self) -> Element<Message> {
-        let config = self.config.borrow();
-        let dt = self.time.format(&config.time_format);
-        let mut time_text = String::new();
-
-        if let Err(_) = dt.write_to(&mut time_text) {
-            time_text = String::from("Invalid time format")
-        }
-
         let mut bold = Font::DEFAULT;
         bold.weight = Weight::Bold;
 
-        let time_widget = text(time_text)
+        let time_text = self.time.format_with_items(self.format_parsed.iter());
+        let time_widget = text(time_text.to_string())
             .size(100)
             .font(bold)
             .width(Length::Fill)

@@ -1,5 +1,3 @@
-use std::fmt;
-
 #[derive(Debug, Clone, PartialEq, strum::Display, strum::VariantArray)]
 pub enum BackgroundMode {
     Unsplash,
