@@ -99,7 +99,7 @@ impl Fjordgard {
 
                 if &self.format_string != config_format {
                     self.format_string = config_format.clone();
-                    self.format_parsed = StrftimeItems::new_lenient(&config_format)
+                    self.format_parsed = StrftimeItems::new_lenient(config_format)
                         .parse_to_owned()
                         .unwrap();
                 }

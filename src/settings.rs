@@ -77,8 +77,7 @@ impl Settings {
             .unwrap_or_default();
         let name = location
             .as_ref()
-            .map(|l| l.name.clone())
-            .flatten()
+            .and_then(|l| l.name.clone())
             .unwrap_or_default();
         let location = location
             .as_ref()
@@ -273,7 +272,7 @@ impl Settings {
             row![text(self.background_mode.edit_text()).width(Length::FillPortion(1))];
 
         if self.background_mode == BackgroundMode::Local {
-            let text = if self.background == "" {
+            let text = if self.background.is_empty() {
                 "Select file..."
             } else {
                 &self.background
