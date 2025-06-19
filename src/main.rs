@@ -1,9 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use chrono::{
     DateTime, Local,
     format::{Item, StrftimeItems},
 };
+use fjordgard_weather::MeteoClient;
 use iced::{
     Color, Element, Font, Length, Size, Subscription, Task,
     font::Weight,
@@ -23,6 +24,7 @@ mod settings;
 
 struct Fjordgard {
     config: Rc<RefCell<Config>>,
+    meteo: Arc<MeteoClient>,
     time: DateTime<Local>,
     background: BackgroundKind,
     format_string: String,
@@ -62,9 +64,12 @@ impl Fjordgard {
             .parse_to_owned()
             .unwrap();
 
+        let meteo = MeteoClient::new(None).unwrap();
+
         (
             Self {
                 config: Rc::new(RefCell::new(config)),
+                meteo: Arc::new(meteo),
                 time: Local::now(),
                 background: BackgroundKind::Color(Color::from_rgb8(255, 255, 255)),
                 format_string,
@@ -109,7 +114,10 @@ impl Fjordgard {
                         ..Default::default()
                     });
 
-                    self.settings_window = Some(settings::Settings::new(self.config.clone()));
+                    self.settings_window = Some(settings::Settings::new(
+                        self.config.clone(),
+                        self.meteo.clone(),
+                    ));
 
                     open.map(Message::SettingsOpened)
                 } else {

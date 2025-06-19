@@ -1,11 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
+use fjordgard_weather::{MeteoClient, model::Location};
 use iced::{
     Background, Border, Color, Element, Length, Task, Theme,
-    widget::{
-        button, column, combo_box, container, row, scrollable, text, text_input, vertical_space,
-    },
-    window,
+    widget::{button, column, combo_box, container, row, scrollable, text, text_input, tooltip},
 };
 use rfd::{AsyncFileDialog, FileHandle};
 use strum::VariantArray;
@@ -20,7 +18,8 @@ pub enum WeatherLocation {
     Coordinates,
 }
 
-pub struct Location {
+#[derive(Debug, Clone)]
+pub struct LocationRow {
     name: String,
     latitude: f64,
     longitude: f64,
@@ -28,6 +27,7 @@ pub struct Location {
 
 pub struct Settings {
     config: Rc<RefCell<Config>>,
+    meteo: Arc<MeteoClient>,
     backgrounds: combo_box::State<BackgroundMode>,
     locations: combo_box::State<WeatherLocation>,
     file_selector_open: bool,
@@ -41,7 +41,8 @@ pub struct Settings {
     latitude: String,
     longitude: String,
 
-    location_results: Vec<Location>,
+    location_results: Vec<LocationRow>,
+    location_fetch_error: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,8 @@ pub enum Message {
     Location(WeatherLocation),
     Name(String),
     NameSubmitted,
+    Geocode(Result<Vec<Location>, String>),
+    LocationSelected(LocationRow),
     Latitude(String),
     Longitude(String),
     Save,
@@ -60,7 +63,7 @@ pub enum Message {
 }
 
 impl Settings {
-    pub fn new(config: Rc<RefCell<Config>>) -> Self {
+    pub fn new(config: Rc<RefCell<Config>>, meteo: Arc<MeteoClient>) -> Self {
         let original_config = config.borrow().clone();
         let location = original_config.location;
 
@@ -89,6 +92,7 @@ impl Settings {
 
         Self {
             config,
+            meteo,
             backgrounds: combo_box::State::new(BackgroundMode::VARIANTS.to_vec()),
             locations: combo_box::State::new(WeatherLocation::VARIANTS.to_vec()),
             file_selector_open: false,
@@ -103,6 +107,7 @@ impl Settings {
             name,
 
             location_results: vec![],
+            location_fetch_error: None,
         }
     }
 
@@ -127,6 +132,48 @@ impl Settings {
             }
             Message::Name(name) => {
                 self.name = name;
+                Task::none()
+            }
+            Message::NameSubmitted => {
+                self.location_fetch_error = None;
+                let meteo = self.meteo.clone();
+                let name = self.name.clone();
+
+                Task::future(async move { meteo.geocode(&name, None).await })
+                    .map(|r| Message::Geocode(r.map_err(|e| e.to_string())))
+            }
+            Message::Geocode(locations) => {
+                match locations {
+                    Err(s) => {
+                        self.location_fetch_error = Some(s);
+                    }
+                    Ok(res) => {
+                        self.location_results = res
+                            .iter()
+                            .map(|l| {
+                                let level1 = if let Some(admin1) = &l.admin1 {
+                                    format!(", {admin1}")
+                                } else {
+                                    String::new()
+                                };
+
+                                LocationRow {
+                                    name: format!("{}{level1}, {}", l.name, l.country),
+                                    latitude: l.latitude,
+                                    longitude: l.longitude,
+                                }
+                            })
+                            .collect()
+                    }
+                };
+
+                Task::none()
+            }
+            Message::LocationSelected(loc) => {
+                self.name = loc.name;
+                self.latitude = loc.latitude.to_string();
+                self.longitude = loc.longitude.to_string();
+
                 Task::none()
             }
             Message::Latitude(latitude) => {
@@ -229,9 +276,38 @@ impl Settings {
                     "{} ({}, {})",
                     res.name, res.latitude, res.longitude
                 )))
-                .style(button::text),
+                .style(button::text)
+                .on_press_with(|| Message::LocationSelected(res.clone())),
             )
         }
+
+        let location_style = if self.location_fetch_error.is_some() {
+            save_message = None;
+            text_input_error
+        } else {
+            text_input::default
+        };
+
+        let mut location_row: Element<Message> = row![
+            text("Location").width(Length::FillPortion(1)),
+            text_input("", &self.name)
+                .width(Length::FillPortion(2))
+                .on_input_maybe(name)
+                .on_submit(Message::NameSubmitted)
+                .style(location_style)
+        ]
+        .into();
+
+        if let Some(err) = &self.location_fetch_error {
+            location_row = tooltip(
+                location_row,
+                container(err.as_ref())
+                    .padding(5)
+                    .style(container::rounded_box),
+                tooltip::Position::Top,
+            )
+            .into()
+        };
 
         scrollable(
             container(
@@ -272,12 +348,7 @@ impl Settings {
                             .on_input_maybe(longitude)
                             .style(longitude_style)
                     ],
-                    row![
-                        text("Location").width(Length::FillPortion(1)),
-                        text_input("", &self.name)
-                            .width(Length::FillPortion(2))
-                            .on_input_maybe(name),
-                    ],
+                    location_row,
                     scrollable(results)
                         .height(Length::Fixed(
                             64.0 * (self.location_results.len().clamp(0, 1) as f32)
