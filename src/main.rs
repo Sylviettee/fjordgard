@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use chrono::{DateTime, Local};
 use iced::{
     Color, Element, Font, Length, Size, Subscription, Task,
@@ -11,23 +13,21 @@ use iced::{
 };
 
 use background::{BackgroundKind, background};
-use config::Config;
+use config::{BackgroundMode, Config};
 use icon::{icon, icon_button};
 use strum::VariantArray;
-
-use crate::config::BackgroundMode;
 
 mod background;
 mod config;
 mod icon;
+mod settings;
 
 struct Fjordgard {
-    config: Config,
+    config: Rc<RefCell<Config>>,
     time: DateTime<Local>,
     background: BackgroundKind,
-    backgrounds: combo_box::State<BackgroundMode>,
 
-    settings_window: Option<window::Id>,
+    settings_window: Option<settings::Settings>,
     main_window: window::Id,
 }
 
@@ -48,8 +48,7 @@ enum Message {
     MainWindowOpened,
     WindowClosed(window::Id),
 
-    ConfigBackgroundMode(BackgroundMode),
-    ConfigTimeFormat(String),
+    Settings(settings::Message),
 }
 
 impl Fjordgard {
@@ -58,10 +57,9 @@ impl Fjordgard {
 
         (
             Self {
-                config: Config::default(),
+                config: Rc::new(RefCell::new(Config::default())),
                 time: Local::now(),
                 background: BackgroundKind::Color(Color::from_rgb8(255, 255, 255)),
-                backgrounds: combo_box::State::new(BackgroundMode::VARIANTS.to_vec()),
 
                 settings_window: None,
                 main_window: id,
@@ -91,7 +89,7 @@ impl Fjordgard {
                         ..Default::default()
                     });
 
-                    self.settings_window = Some(id);
+                    self.settings_window = Some(settings::Settings::new(id, self.config.clone()));
 
                     open.map(Message::SettingsOpened)
                 } else {
@@ -106,14 +104,12 @@ impl Fjordgard {
                     Task::none()
                 }
             }
-            Message::ConfigBackgroundMode(mode) => {
-                self.config.background = mode.default_background().to_string();
-                self.config.background_mode = mode;
-                Task::none()
-            }
-            Message::ConfigTimeFormat(format) => {
-                self.config.time_format = format;
-                Task::none()
+            Message::Settings(msg) => {
+                if let Some(settings) = &mut self.settings_window {
+                    settings.update(msg).map(Message::Settings)
+                } else {
+                    Task::none()
+                }
             }
             _ => Task::none(),
         }
@@ -123,12 +119,17 @@ impl Fjordgard {
         if self.main_window == window_id {
             self.view_main()
         } else {
-            self.view_settings()
+            self.settings_window
+                .as_ref()
+                .expect("settings window")
+                .view()
+                .map(Message::Settings)
         }
     }
 
     fn view_main(&self) -> Element<Message> {
-        let dt = self.time.format(&self.config.time_format);
+        let config = self.config.borrow();
+        let dt = self.time.format(&config.time_format);
         let mut time_text = String::new();
 
         if let Err(_) = dt.write_to(&mut time_text) {
@@ -174,58 +175,6 @@ impl Fjordgard {
         ]
         .height(Length::Fill)
         .width(Length::Fill)
-        .into()
-    }
-
-    fn view_settings(&self) -> Element<Message> {
-        let placeholder = Config::default();
-        let config = &self.config;
-
-        let mut background_mode_row =
-            row![text(config.background_mode.edit_text()).width(Length::FillPortion(1)),];
-
-        if config.background_mode == BackgroundMode::Local {
-            let text = if config.background == "" {
-                "Select file..."
-            } else {
-                &config.background
-            };
-
-            background_mode_row =
-                background_mode_row.push(button(text).width(Length::FillPortion(2)));
-        } else {
-            background_mode_row = background_mode_row.push(
-                text_input(
-                    config.background_mode.default_background(),
-                    &config.background,
-                )
-                .width(Length::FillPortion(2)),
-            );
-        }
-
-        container(
-            column![
-                row![
-                    text("Time format").width(Length::FillPortion(1)),
-                    text_input(&placeholder.time_format, &config.time_format)
-                        .width(Length::FillPortion(2))
-                        .on_input(Message::ConfigTimeFormat)
-                ],
-                row![
-                    text("Background mode").width(Length::FillPortion(1)),
-                    combo_box(
-                        &self.backgrounds,
-                        "",
-                        Some(&placeholder.background_mode),
-                        Message::ConfigBackgroundMode
-                    )
-                    .width(Length::FillPortion(2))
-                ],
-                background_mode_row
-            ]
-            .spacing(10),
-        )
-        .padding(15)
         .into()
     }
 

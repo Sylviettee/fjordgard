@@ -26,14 +26,15 @@ impl BackgroundMode {
     }
 }
 
+#[derive(Clone)]
 pub struct Location {
     pub longitude: f64,
     pub latitude: f64,
     pub name: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct Config {
-    pub timezone: String,
     pub time_format: String,
     pub background_mode: BackgroundMode,
     pub background: String,
@@ -43,7 +44,6 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            timezone: String::from("Etc/UTC"),
             time_format: String::from("%-I:%M:%S"),
             background_mode: BackgroundMode::Unsplash,
             background: BackgroundMode::Unsplash.default_background().to_string(),
