@@ -4,7 +4,10 @@ use chrono::{
     DateTime, Local,
     format::{Item, StrftimeItems},
 };
-use fjordgard_weather::MeteoClient;
+use fjordgard_weather::{
+    MeteoClient,
+    model::{CurrentVariable, Forecast, ForecastOptions},
+};
 use iced::{
     Color, Element, Font, Length, Size, Subscription, Task,
     font::Weight,
@@ -16,7 +19,7 @@ use iced::{
 use background::BackgroundHandle;
 use config::Config;
 use icon::{icon, icon_button};
-use log::debug;
+use log::{debug, error};
 
 use crate::config::BackgroundMode;
 
@@ -35,6 +38,10 @@ struct Fjordgard {
 
     settings_window: Option<settings::Settings>,
     main_window: window::Id,
+
+    forecast_loaded: bool,
+    forecast_text: String,
+    forecast_icon: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -56,6 +63,9 @@ enum Message {
 
     Settings(settings::Message),
     Background(background::Message),
+
+    RequestForecastUpdate,
+    ForecastUpdate(Result<Forecast, String>),
 }
 
 impl Fjordgard {
@@ -82,8 +92,12 @@ impl Fjordgard {
 
                 settings_window: None,
                 main_window: id,
+
+                forecast_loaded: false,
+                forecast_text: String::from("Weather unknown"),
+                forecast_icon: String::from("icons/weather/not-available.svg"),
             },
-            Task::batch(vec![
+            Task::batch([
                 open.map(|_| Message::MainWindowOpened),
                 task.map(Message::Background),
             ]),
@@ -142,9 +156,16 @@ impl Fjordgard {
                         .unwrap();
                 }
 
-                self.background
+                let background_task = self
+                    .background
                     .load_config(&config)
-                    .map(Message::Background)
+                    .map(Message::Background);
+
+                if !self.forecast_loaded && config.location.is_some() {
+                    Task::batch([background_task, Task::done(Message::RequestForecastUpdate)])
+                } else {
+                    background_task
+                }
             }
             Message::Settings(msg) => {
                 if let Some(settings) = &mut self.settings_window {
@@ -162,6 +183,61 @@ impl Fjordgard {
                 debug!("main window opened");
                 Task::none()
             }
+            Message::RequestForecastUpdate => {
+                let config = self.config.borrow();
+                if let Some(location) = &config.location {
+                    let meteo = self.meteo.clone();
+                    let (latitude, longitude) = (location.latitude, location.latitude);
+
+                    Task::future(async move {
+                        meteo
+                            .forecast_single(
+                                latitude,
+                                longitude,
+                                Some(ForecastOptions {
+                                    current: Some(vec![
+                                        CurrentVariable::Temperature2m,
+                                        CurrentVariable::Rain,
+                                        CurrentVariable::Snowfall,
+                                        CurrentVariable::IsDay,
+                                        CurrentVariable::CloudCover,
+                                    ]),
+                                    ..Default::default()
+                                }),
+                            )
+                            .await
+                    })
+                    .map(|r| Message::ForecastUpdate(r.map_err(|e| e.to_string())))
+                } else {
+                    Task::none()
+                }
+            }
+            Message::ForecastUpdate(res) => match res {
+                Err(e) => {
+                    error!("failed to load forecast: {e}");
+                    Task::none()
+                }
+                Ok(forecast) => {
+                    let forecast_text = || -> Option<String> {
+                        let current = forecast.current?;
+                        let units = forecast.current_units?;
+
+                        let temperature = current.data.get(&CurrentVariable::Temperature2m)?;
+                        let temperature_units = units.get(&CurrentVariable::Temperature2m)?;
+
+                        // TODO; calculate descriptor string
+                        // TODO; calculate icon
+                        Some(format!("{temperature}{temperature_units}"))
+                    };
+
+                    if let Some(forecast_text) = forecast_text() {
+                        self.forecast_loaded = true;
+                        self.forecast_text = forecast_text;
+                    }
+
+                    Task::none()
+                }
+            },
             _ => Task::none(),
         }
     }
@@ -191,9 +267,9 @@ impl Fjordgard {
             .center();
 
         let weather_widget = container(row![
-            icon("icons/weather/not-available.svg"),
+            icon(&self.forecast_icon),
             horizontal_space().width(Length::Fixed(7.25)),
-            text("Weather unknown").color(Color::WHITE)
+            text(&self.forecast_text).color(Color::WHITE)
         ])
         .center_x(Length::Fill);
 
@@ -225,8 +301,9 @@ impl Fjordgard {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::batch(vec![
+        Subscription::batch([
             time::every(time::Duration::from_secs(1)).map(|_| Message::Tick(Local::now())),
+            time::every(time::Duration::from_secs(60 * 15)).map(|_| Message::RequestForecastUpdate),
             window::close_events().map(Message::WindowClosed),
         ])
     }

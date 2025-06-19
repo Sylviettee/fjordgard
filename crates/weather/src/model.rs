@@ -297,6 +297,46 @@ pub enum CurrentVariable {
     Time,
     /// NOTE: Not a valid variable, only found within `.current_units`
     Interval,
+
+    // Duplicates of Hourly (interpolated)
+    PressureMsl,
+    SurfacePressure,
+    CloudCover,
+    CloudCoverLow,
+    CloudCoverMid,
+    CloudCoverHigh,
+    #[strum(to_string = "wind_speed_120m")]
+    WindSpeed120m,
+    #[strum(to_string = "wind_speed_180m")]
+    WindSpeed180m,
+    #[strum(to_string = "wind_direction_120m")]
+    WindDirection120m,
+    #[strum(to_string = "wind_direction_180m")]
+    WindDIrection180m,
+    VapourPressureDeficit,
+    Evapotranspiration,
+    Et0FaoEvapotranspiration,
+    PrecipitationProbability,
+    SnowDepth,
+    #[strum(to_string = "soil_temperature_0cm")]
+    SoilTemperature0cm,
+    #[strum(to_string = "soil_temperature_6cm")]
+    SoilTemperature6cm,
+    #[strum(to_string = "soil_temperature_18cm")]
+    SoilTemperature18cm,
+    #[strum(to_string = "soil_temperature_54cm")]
+    SoilTemperature54cm,
+    #[strum(to_string = "soil_moisture_0_to_1cm")]
+    SoilMoisture0To1cm,
+    #[strum(to_string = "soil_moisture_1_to_3cm")]
+    SoilMoisture1To3cm,
+    #[strum(to_string = "soil_moisture_3_to_9cm")]
+    SoilMoisture3To9cm,
+    #[strum(to_string = "soil_moisture_9_to_27cm")]
+    SoilMoisture9To27cm,
+    #[strum(to_string = "soil_moisture_27_to_81cm")]
+    SoilMoisture28To81cm,
+    IsDay,
 }
 
 #[derive(Serialize)]
