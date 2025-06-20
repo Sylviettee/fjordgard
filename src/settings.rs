@@ -1,3 +1,5 @@
+#[cfg(target_arch = "wasm32")]
+use std::ops::Deref;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use fjordgard_weather::{MeteoClient, model::Location};
@@ -61,6 +63,9 @@ pub enum Message {
     Latitude(String),
     Longitude(String),
     FileSelector,
+    #[cfg(target_arch = "wasm32")]
+    FileSelected(send_wrapper::SendWrapper<Option<FileHandle>>),
+    #[cfg(not(target_arch = "wasm32"))]
     FileSelected(Option<FileHandle>),
     Save,
 
@@ -209,10 +214,21 @@ impl Settings {
                     .add_filter("image", &["png", "jpeg", "jpg"])
                     .pick_file();
 
-                Task::future(file_task).map(Message::FileSelected)
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    Task::future(file_task).map(Message::FileSelected)
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    Task::future(file_task)
+                        .map(|h| Message::FileSelected(send_wrapper::SendWrapper::new(h)))
+                }
             }
             Message::FileSelected(file) => {
                 self.file_selector_open = false;
+
+                #[cfg(target_arch = "wasm32")]
+                let file = file.deref();
 
                 if let Some(file) = file {
                     #[cfg(not(target_arch = "wasm32"))]

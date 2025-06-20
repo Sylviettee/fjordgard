@@ -10,25 +10,24 @@ use fjordgard_weather::{
 };
 use iced::{
     Color, Element, Font, Length, Size, Subscription, Task,
-    font::Weight,
     time,
     widget::{center, column, container, horizontal_space, row, stack, text},
     window,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use iced::font::Weight;
 
 use background::BackgroundHandle;
-use config::Config;
+use config::{BackgroundMode, Config};
 use icon::{icon, icon_button};
 use log::{debug, error};
-
-use crate::config::BackgroundMode;
 
 mod background;
 mod config;
 mod icon;
 mod settings;
 
-struct Fjordgard {
+pub struct Fjordgard {
     config: Rc<RefCell<Config>>,
     meteo: Arc<MeteoClient>,
     time: DateTime<Local>,
@@ -46,14 +45,14 @@ struct Fjordgard {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum MediaControl {
+pub enum MediaControl {
     Pause,
     Previous,
     Next,
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+pub enum Message {
     Tick(DateTime<Local>),
     Media(MediaControl),
     OpenSettings,
@@ -75,7 +74,11 @@ impl Fjordgard {
         let settings = window::Settings::default();
         let main_window_size = settings.size;
 
+        // #[cfg(not(target_arch = "wasm32"))]
         let (id, open) = window::open(settings);
+        // #[cfg(target_arch = "wasm32")]
+        // let (id, open) = wasm::window_open(settings);
+
         let config = Config::load().unwrap();
 
         let format_string = config.time_format.clone();
@@ -353,8 +356,12 @@ impl Fjordgard {
     }
 
     fn view_main(&self) -> Element<Message> {
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
         let mut bold = Font::DEFAULT;
-        bold.weight = Weight::Bold;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            bold.weight = Weight::Bold;
+        }
 
         let time_text = self.time.format_with_items(self.format_parsed.iter());
         let time_widget = text(time_text.to_string())
@@ -410,19 +417,17 @@ impl Fjordgard {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn main() -> iced::Result {
+    #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init_with_level(log::Level::Info).unwrap();
+    }
 
     iced::daemon(Fjordgard::title, Fjordgard::update, Fjordgard::view)
         .subscription(Fjordgard::subscription)
         .run_with(Fjordgard::new)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn main() -> iced::Result {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init_with_level(log::Level::Info).unwrap();
-
-    Ok(())
 }
