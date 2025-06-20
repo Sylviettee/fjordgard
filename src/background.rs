@@ -3,37 +3,12 @@ use fjordgard_unsplash::{
     model::{Collection, CollectionPhotos, CollectionPhotosOptions, Format, PhotoFetchOptions},
 };
 use iced::{
-    Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme, mouse,
-    widget::{button, canvas, container, image, row, stack, text},
+    Color, ContentFit, Element, Length, Size, Task,
+    widget::{button, container, image, row, stack, text},
 };
 use log::{debug, error};
 
 use crate::config::{BackgroundMode, Config};
-
-struct Solid(Color);
-
-impl<Message> canvas::Program<Message> for Solid {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &Renderer,
-        _theme: &Theme,
-        bounds: iced::Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry<Renderer>> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-
-        frame.fill_rectangle(
-            Point::ORIGIN,
-            Size::new(bounds.width, bounds.height),
-            self.0,
-        );
-
-        vec![frame.into_geometry()]
-    }
-}
 
 pub struct UnsplashState {
     collection: String,
@@ -293,9 +268,10 @@ impl BackgroundHandle {
     }
 
     fn solid<'a>(color: Color) -> Element<'a, Message> {
-        canvas(Solid(color))
+        container("")
             .width(Length::Fill)
             .height(Length::Fill)
+            .style(move |_| container::background(color))
             .into()
     }
 
