@@ -3,8 +3,9 @@ use fjordgard_unsplash::{
     model::{Collection, CollectionPhotos, CollectionPhotosOptions, Format, PhotoFetchOptions},
 };
 use iced::{
-    Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme, mouse,
-    widget::{canvas, container, image, stack, text},
+    Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme,
+    mouse,
+    widget::{button, canvas, container, image, row, stack, text},
 };
 use log::{debug, error};
 use tokio::fs;
@@ -65,6 +66,7 @@ pub enum Message {
     UnsplashCollectionPhotos(Result<CollectionPhotos, String>),
     RequestUnsplash(isize),
     PauseUnsplash,
+    OpenUrl(String),
 }
 
 impl BackgroundHandle {
@@ -270,6 +272,13 @@ impl BackgroundHandle {
                     Task::none()
                 }
             }
+            Message::OpenUrl(url) => {
+                if let Err(e) = open::that_detached(url) {
+                    error!("failed to open link: {e}")
+                }
+
+                Task::none()
+            }
         }
     }
 
@@ -295,15 +304,62 @@ impl BackgroundHandle {
                     if self.mode == BackgroundMode::Local {
                         img.into()
                     } else {
-                        stack![
-                            img,
-                            // TODO; finish credits
-                            container(text("Photo, John Doe, Unsplash"))
-                                .align_left(Length::Fill)
-                                .align_bottom(Length::Fill)
-                                .padding(15)
-                        ]
-                        .into()
+                        if let Some(state) = &self.unsplash_state {
+                            let idx = state.current % 10;
+                            if let Some(photo) = state
+                                .current_page_photos
+                                .as_ref()
+                                .and_then(|c| c.photos.get(idx))
+                            {
+                                let suffix = "?utm_source=fjordgard&utm_medium=referral";
+
+                                let photo_url = format!("{}{suffix}", photo.links.html);
+
+                                let user = &photo.user;
+
+                                let author = format!(
+                                    "{}{}",
+                                    user.first_name,
+                                    user.last_name
+                                        .as_ref()
+                                        .map(|l| format!(" {l}"))
+                                        .unwrap_or_default()
+                                );
+                                let author_url = format!("{}{suffix}", user.links.html);
+
+                                return stack![
+                                    img,
+                                    container(
+                                        row![
+                                            button(text("Photo").color(Color::WHITE))
+                                                .style(button::text)
+                                                .on_press_with(move || Message::OpenUrl(
+                                                    photo_url.clone()
+                                                )),
+                                            text(".").color(Color::WHITE),
+                                            button(text(author).color(Color::WHITE))
+                                                .style(button::text)
+                                                .on_press_with(move || Message::OpenUrl(
+                                                    author_url.clone()
+                                                )),
+                                            text(".").color(Color::WHITE),
+                                            button(text("Unsplash").color(Color::WHITE))
+                                                .style(button::text)
+                                                .on_press_with(move || Message::OpenUrl(format!(
+                                                    "https://unsplash.com/{suffix}"
+                                                ))),
+                                        ]
+                                        .spacing(0)
+                                    )
+                                    .align_left(Length::Fill)
+                                    .align_bottom(Length::Fill)
+                                    .padding(15)
+                                ]
+                                .into();
+                            }
+                        }
+
+                        img.into()
                     }
                 } else {
                     Self::solid(Color::BLACK)

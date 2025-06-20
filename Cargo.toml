@@ -16,6 +16,7 @@ fjordgard-unsplash = { version = "0.1.0", path = "crates/unsplash" }
 fjordgard-weather = { version = "0.1.0", path = "crates/weather" }
 iced = { version = "0.13.1", features = ["tokio", "canvas", "image", "svg"] }
 log = "0.4.27"
+open = "5.3.2"
 rfd = "0.15.3"
 strum = { version = "0.27.1", features = ["derive"] }
 tokio = { version = "1.45.1", features = ["full"] }
