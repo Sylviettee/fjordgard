@@ -38,6 +38,7 @@ struct Fjordgard {
 
     settings_window: Option<settings::Settings>,
     main_window: window::Id,
+    main_window_size: Size,
 
     coordinate_pair: Option<(f64, f64)>,
     forecast_text: String,
@@ -60,6 +61,7 @@ enum Message {
     SettingsOpened,
     MainWindowOpened,
     WindowClosed(window::Id),
+    WindowResized((window::Id, Size)),
 
     Settings(settings::Message),
     Background(background::Message),
@@ -70,7 +72,10 @@ enum Message {
 
 impl Fjordgard {
     fn new() -> (Self, Task<Message>) {
-        let (id, open) = window::open(window::Settings::default());
+        let settings = window::Settings::default();
+        let main_window_size = settings.size.clone();
+
+        let (id, open) = window::open(settings);
         let config = Config::default();
 
         let format_string = config.time_format.clone();
@@ -79,7 +84,7 @@ impl Fjordgard {
             .unwrap();
 
         let meteo = MeteoClient::new(None).unwrap();
-        let (background, task) = BackgroundHandle::new(&config);
+        let (background, task) = BackgroundHandle::new(&config, main_window_size.clone());
 
         (
             Self {
@@ -92,6 +97,7 @@ impl Fjordgard {
 
                 settings_window: None,
                 main_window: id,
+                main_window_size,
 
                 coordinate_pair: None,
                 forecast_text: String::from("Weather unknown"),
@@ -156,6 +162,15 @@ impl Fjordgard {
                     Task::none()
                 }
             }
+            Message::WindowResized((id, size)) => {
+                if self.main_window != id {
+                    return Task::none();
+                }
+
+                self.main_window_size = size;
+
+                Task::none()
+            }
             Message::Settings(settings::Message::Committed) => {
                 let config = self.config.borrow();
                 let config_format = &config.time_format;
@@ -169,7 +184,7 @@ impl Fjordgard {
 
                 let background_task = self
                     .background
-                    .load_config(&config)
+                    .load_config(&config, self.main_window_size.clone())
                     .map(Message::Background);
 
                 let new_pair = config.location.as_ref().map(|l| (l.latitude, l.longitude));
@@ -386,6 +401,7 @@ impl Fjordgard {
             time::every(time::Duration::from_secs(60 * 15))
                 .map(|_| Message::Background(background::Message::RequestUnsplash(1))),
             window::close_events().map(Message::WindowClosed),
+            window::resize_events().map(Message::WindowResized),
         ])
     }
 }

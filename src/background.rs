@@ -49,6 +49,7 @@ pub struct UnsplashState {
 pub struct BackgroundHandle {
     pub mode: BackgroundMode,
     background: String,
+    size: Size,
 
     image_handle: Option<image::Handle>,
 
@@ -67,10 +68,12 @@ pub enum Message {
 }
 
 impl BackgroundHandle {
-    pub fn new(config: &Config) -> (Self, Task<Message>) {
+    pub fn new(config: &Config, size: Size) -> (Self, Task<Message>) {
         let mut handle = Self {
             mode: config.background_mode,
             background: config.background.clone(),
+            size,
+
             image_handle: None,
 
             unsplash_key: config.unsplash_key.clone(),
@@ -83,9 +86,10 @@ impl BackgroundHandle {
         (handle, task)
     }
 
-    pub fn load_config(&mut self, config: &Config) -> Task<Message> {
+    pub fn load_config(&mut self, config: &Config, size: Size) -> Task<Message> {
         self.mode = config.background_mode;
         self.background = config.background.clone();
+        self.size = size;
 
         if self.unsplash_key != config.unsplash_key {
             self.unsplash_key = config.unsplash_key.clone();
@@ -237,6 +241,7 @@ impl BackgroundHandle {
 
                         let client = client.clone();
                         let photo = photo.clone();
+                        let size = self.size.clone();
 
                         Task::future(async move {
                             client
@@ -244,6 +249,8 @@ impl BackgroundHandle {
                                     &photo,
                                     Some(PhotoFetchOptions {
                                         fm: Some(Format::Png),
+                                        w: Some(size.width.round().into()),
+                                        h: Some(size.height.round().into()),
                                         ..Default::default()
                                     }),
                                 )
