@@ -1,0 +1,29 @@
+# Referenced https://github.com/eza-community/eza/blob/main/.github/workflows/unit-tests.yml
+name: Testing
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  lint:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - run: rustup toolchain install sable --profile minimal
+        uses: Swatinem/rust-cache@v2
+      - name: Run rustfmt checks
+        run: cargo fmt --check
+      - name: Run clippy lints
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: cargo clippy -- -D warnings
+      - name: Run weather tests
+        run: cargo test --package fjordgard-weather
+      # Unsplash requires API key & it would waste requests
+      # - name: Run unsplash tests
+      #   run: cargo test --package fjordgard-unsplash
