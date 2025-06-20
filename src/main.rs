@@ -383,6 +383,8 @@ impl Fjordgard {
         Subscription::batch([
             time::every(time::Duration::from_secs(1)).map(|_| Message::Tick(Local::now())),
             time::every(time::Duration::from_secs(60 * 15)).map(|_| Message::RequestForecastUpdate),
+            time::every(time::Duration::from_secs(60 * 15))
+                .map(|_| Message::Background(background::Message::RequestUnsplash(1))),
             window::close_events().map(Message::WindowClosed),
         ])
     }

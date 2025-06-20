@@ -176,9 +176,15 @@ impl BackgroundHandle {
                             return Task::none();
                         }
 
-                        state.current = (direction + (state.current as isize))
-                            .clamp(0, state.total as isize)
-                            as usize;
+                        let mut new = state.current as isize + direction;
+
+                        if new < 0 {
+                            new = state.total as isize;
+                        } else if new > state.total as isize {
+                            new = 0;
+                        }
+
+                        state.current = new as usize;
 
                         let page = (state.current / 10) + 1;
 
