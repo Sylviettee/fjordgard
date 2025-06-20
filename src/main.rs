@@ -119,6 +119,11 @@ impl Fjordgard {
 
                 Task::none()
             }
+            Message::Media(action) => match action {
+                MediaControl::Next => Task::done(Message::Background(background::Message::RequestUnsplash(1))),
+                MediaControl::Previous => Task::done(Message::Background(background::Message::RequestUnsplash(-1))),
+                MediaControl::Pause => Task::done(Message::Background(background::Message::PauseUnsplash)),
+            }
             Message::OpenSettings => {
                 if self.settings_window.is_none() {
                     let (_id, open) = window::open(window::Settings {
@@ -306,8 +311,7 @@ impl Fjordgard {
 
                     Task::none()
                 }
-            },
-            _ => Task::none(),
+            }
         }
     }
 

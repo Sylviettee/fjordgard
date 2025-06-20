@@ -63,6 +63,7 @@ pub enum Message {
     UnsplashCollection(Result<Collection, String>),
     UnsplashCollectionPhotos(Result<CollectionPhotos, String>),
     RequestUnsplash(isize),
+    PauseUnsplash,
 }
 
 impl BackgroundHandle {
@@ -247,6 +248,12 @@ impl BackgroundHandle {
                     _ => Task::none(),
                 },
             },
+            Message::PauseUnsplash => if let Some(state) = &mut self.unsplash_state {
+                state.paused = !state.paused;
+                Task::none()
+            } else {
+                Task::none()
+            }
         }
     }
 
