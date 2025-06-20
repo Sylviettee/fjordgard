@@ -73,7 +73,7 @@ enum Message {
 impl Fjordgard {
     fn new() -> (Self, Task<Message>) {
         let settings = window::Settings::default();
-        let main_window_size = settings.size.clone();
+        let main_window_size = settings.size;
 
         let (id, open) = window::open(settings);
         let config = Config::default();
@@ -84,7 +84,7 @@ impl Fjordgard {
             .unwrap();
 
         let meteo = MeteoClient::new(None).unwrap();
-        let (background, task) = BackgroundHandle::new(&config, main_window_size.clone());
+        let (background, task) = BackgroundHandle::new(&config, main_window_size);
 
         (
             Self {
@@ -184,7 +184,7 @@ impl Fjordgard {
 
                 let background_task = self
                     .background
-                    .load_config(&config, self.main_window_size.clone())
+                    .load_config(&config, self.main_window_size)
                     .map(Message::Background);
 
                 let new_pair = config.location.as_ref().map(|l| (l.latitude, l.longitude));
@@ -318,7 +318,6 @@ impl Fjordgard {
                             _ => 100,
                         };
 
-                        // TODO; calculate icon
                         Some((
                             format!("{temperature}{temperature_units} {condition_text}"),
                             format!("icons/weather/{icon_condition}-{is_day}.svg"),

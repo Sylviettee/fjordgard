@@ -241,7 +241,7 @@ impl BackgroundHandle {
 
                         let client = client.clone();
                         let photo = photo.clone();
-                        let size = self.size.clone();
+                        let size = self.size;
 
                         Task::future(async move {
                             client
