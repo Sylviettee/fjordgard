@@ -10,6 +10,7 @@ use serde::{Serialize, de::DeserializeOwned};
 mod error;
 pub mod model;
 
+#[cfg(not(target_arch = "wasm32"))]
 const USER_AGENT: &str = concat!("fjordgard/", env!("CARGO_PKG_VERSION"));
 const GEOCODING_API_HOST: &str = "geocoding-api.open-meteo.com";
 const FORECASTING_API_HOST: &str = "api.open-meteo.com";
@@ -21,7 +22,10 @@ pub struct MeteoClient {
 
 impl MeteoClient {
     pub fn new(api_key: Option<&str>) -> Result<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
         let client = Client::builder().user_agent(USER_AGENT).build()?;
+        #[cfg(target_arch = "wasm32")]
+        let client = Client::new();
 
         Ok(Self {
             api_key: api_key.map(|k| k.to_string()),
@@ -103,7 +107,7 @@ mod tests {
             .await
             .unwrap();
 
-        res.get(0).unwrap().clone()
+        res.first().unwrap().clone()
     }
 
     #[tokio::test]
