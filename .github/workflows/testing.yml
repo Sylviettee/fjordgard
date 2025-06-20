@@ -1,11 +1,13 @@
 # Referenced https://github.com/eza-community/eza/blob/main/.github/workflows/unit-tests.yml
-name: Testing
+name: Lint and Test
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   lint:
     runs-on: ${{ matrix.os }}
