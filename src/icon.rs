@@ -1,6 +1,5 @@
 use iced::{
-    Color, Element, Length, Theme,
-    widget::{button, svg},
+    widget::{button, svg, Svg}, Color, Element, Length, Theme
 };
 use rust_embed::Embed;
 
@@ -9,14 +8,13 @@ use rust_embed::Embed;
 #[prefix = "icons/"]
 struct Icon;
 
-pub fn icon<'a, Message>(path: &str) -> Element<'a, Message> {
+pub fn icon<'a>(path: &str) -> Svg<'a, iced::Theme> {
     let bytes = Icon::get(path).unwrap().data;
 
     svg(svg::Handle::from_memory(bytes))
         .height(Length::Fixed(16.0))
         .width(Length::Fixed(16.0))
         .style(white)
-        .into()
 }
 
 pub fn icon_button<'a, Message: 'a + Clone>(

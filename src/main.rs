@@ -412,16 +412,21 @@ impl Fjordgard {
 
         let time_text = self.time.format_with_items(self.format_parsed.iter());
         let time_widget = text(time_text.to_string())
-            .size(100)
+            .size(200)
             .font(bold)
             .color(Color::WHITE)
             .width(Length::Fill)
             .center();
 
         let weather_widget = container(row![
-            icon(&self.forecast_icon),
-            horizontal_space().width(Length::Fixed(7.25)),
-            text(&self.forecast_text).color(Color::WHITE)
+            icon(&self.forecast_icon)
+                .height(Length::Fixed(32.0))
+                .width(Length::Fixed(32.0)),
+            horizontal_space()
+                .width(Length::Fixed(7.25)),
+            text(&self.forecast_text)
+                .color(Color::WHITE)
+                .size(25)
         ])
         .center_x(Length::Fill);
 
