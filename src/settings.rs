@@ -65,6 +65,7 @@ pub enum Message {
     Save,
 
     Committed,
+    Saved(Result<(), String>),
 }
 
 impl Settings {
@@ -217,7 +218,6 @@ impl Settings {
                 Task::none()
             }
             Message::Save => {
-                // TODO; this should also commit to a file
                 let mut config = self.config.borrow_mut();
 
                 config.time_format = self.time_format.clone();
@@ -245,8 +245,21 @@ impl Settings {
                     }
                 }
 
-                Task::done(Message::Committed)
+                let cloned = config.clone();
+
+                Task::batch([
+                    Task::done(Message::Committed),
+                    Task::future(async move { cloned.save().await })
+                        .map(|r| Message::Saved(r.map_err(|e| e.to_string()))),
+                ])
             }
+            Message::Saved(res) => match res {
+                Err(e) => {
+                    error!("failed to save config: {e}");
+                    Task::none()
+                }
+                Ok(()) => Task::none(),
+            },
             _ => Task::none(),
         }
     }

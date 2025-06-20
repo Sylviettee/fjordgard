@@ -3,8 +3,7 @@ use fjordgard_unsplash::{
     model::{Collection, CollectionPhotos, CollectionPhotosOptions, Format, PhotoFetchOptions},
 };
 use iced::{
-    Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme,
-    mouse,
+    Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme, mouse,
     widget::{button, canvas, container, image, row, stack, text},
 };
 use log::{debug, error};

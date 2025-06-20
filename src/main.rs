@@ -76,7 +76,7 @@ impl Fjordgard {
         let main_window_size = settings.size;
 
         let (id, open) = window::open(settings);
-        let config = Config::default();
+        let config = Config::load().unwrap();
 
         let format_string = config.time_format.clone();
         let format_parsed = StrftimeItems::new_lenient(&format_string)
@@ -106,6 +106,7 @@ impl Fjordgard {
             Task::batch([
                 open.map(|_| Message::MainWindowOpened),
                 task.map(Message::Background),
+                Task::done(Message::RequestForecastUpdate),
             ]),
         )
     }

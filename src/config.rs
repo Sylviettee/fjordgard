@@ -1,4 +1,12 @@
-#[derive(Debug, Clone, Copy, PartialEq, strum::Display, strum::VariantArray)]
+use std::fs;
+
+use anyhow::bail;
+use directories::ProjectDirs;
+use serde::{Deserialize, Serialize};
+
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Copy, PartialEq, strum::Display, strum::VariantArray,
+)]
 pub enum BackgroundMode {
     Unsplash,
     Solid,
@@ -24,20 +32,53 @@ impl BackgroundMode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Location {
     pub longitude: f64,
     pub latitude: f64,
     pub name: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub time_format: String,
     pub background_mode: BackgroundMode,
     pub background: String,
     pub unsplash_key: Option<String>,
     pub location: Option<Location>,
+}
+
+impl Config {
+    pub fn load() -> anyhow::Result<Config> {
+        if let Some(dir) = ProjectDirs::from("gay.gayest", "", "fjordgard") {
+            let config_file = dir.config_dir().join("config.json");
+
+            if !config_file.exists() {
+                return Ok(Config::default());
+            }
+
+            let data = fs::read_to_string(config_file)?;
+
+            Ok(serde_json::from_str(&data)?)
+        } else {
+            Ok(Config::default())
+        }
+    }
+
+    pub async fn save(&self) -> anyhow::Result<()> {
+        if let Some(dir) = ProjectDirs::from("gay.gayest", "", "fjordgard") {
+            let config_dir = dir.config_dir();
+            tokio::fs::create_dir_all(config_dir).await?;
+
+            let contents = serde_json::to_string(self)?;
+
+            tokio::fs::write(config_dir.join("config.json"), contents).await?;
+
+            Ok(())
+        } else {
+            bail!("no config directory found")
+        }
+    }
 }
 
 impl Default for Config {
