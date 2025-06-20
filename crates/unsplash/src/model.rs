@@ -6,8 +6,8 @@ use strum::Display;
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub(crate) enum UnsplashResponse {
-    Success(serde_json::Value),
     Error { errors: Vec<String> },
+    Success(serde_json::Value),
 }
 
 #[derive(Serialize)]
@@ -144,7 +144,7 @@ pub enum Crop {
     Faces,
     FocalPoint,
     Edges,
-    Entropy
+    Entropy,
 }
 
 #[derive(Serialize)]
@@ -163,7 +163,7 @@ pub enum Format {
     Png32,
     Webm,
     Webp,
-    BlurHash
+    BlurHash,
 }
 
 #[derive(Serialize)]
@@ -173,7 +173,7 @@ pub enum Auto {
     Enhance,
     True,
     Format,
-    Redeye
+    Redeye,
 }
 
 #[derive(Serialize)]
@@ -187,7 +187,7 @@ pub enum Fit {
     FillMax,
     Max,
     Min,
-    Scale
+    Scale,
 }
 
 #[serde_with::skip_serializing_none]
@@ -216,4 +216,42 @@ fn csv<S: Serializer, T: Display>(list: &Option<Vec<T>>, serializer: S) -> Resul
     } else {
         serializer.serialize_none()
     }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct CollectionLinks {
+    #[serde(rename = "self")]
+    pub this: String,
+    pub html: String,
+    pub photos: String,
+    pub related: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PreviewPhoto {
+    pub id: String,
+    pub slug: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub blur_hash: String,
+    pub asset_type: String,
+    pub urls: PhotoUrls,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Collection {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub published_at: String,
+    pub last_collected_at: String,
+    pub updated_at: String,
+    pub featured: bool,
+    pub total_photos: usize,
+    pub private: bool,
+    pub share_key: String,
+    pub links: CollectionLinks,
+    pub user: User,
+    pub cover_photo: Option<Photo>,
+    pub preview_photos: Vec<PreviewPhoto>,
 }

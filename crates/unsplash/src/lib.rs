@@ -96,7 +96,19 @@ impl UnsplashClient {
         })
     }
 
-    pub async fn download_photo(&self, photo: &Photo, opts: Option<PhotoFetchOptions>) -> Result<Bytes> {
+    pub async fn collection(&self, id: &str) -> Result<Collection> {
+        let (collection, _) = self
+            .request(&format!("collections/{id}"), None::<()>)
+            .await?;
+
+        Ok(collection)
+    }
+
+    pub async fn download_photo(
+        &self,
+        photo: &Photo,
+        opts: Option<PhotoFetchOptions>,
+    ) -> Result<Bytes> {
         let mut req = self.client.get(&photo.urls.raw);
 
         if let Some(ref query) = opts {
@@ -132,5 +144,13 @@ mod tests {
             .unwrap();
 
         assert_eq!(collection.per_page, 5);
+    }
+
+    #[tokio::test]
+    async fn collection() {
+        let client = UnsplashClient::new(&api_key()).unwrap();
+        let collection = client.collection("1053828").await.unwrap();
+
+        assert_eq!(collection.title, "Tabliss Official");
     }
 }
