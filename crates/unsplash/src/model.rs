@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
+use strum::Display;
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
@@ -131,4 +132,88 @@ pub struct UserSocials {
     pub portfolio_url: Option<String>,
     pub twitter_username: Option<String>,
     pub paypal_email: Option<String>,
+}
+
+#[derive(Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum Crop {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    Faces,
+    FocalPoint,
+    Edges,
+    Entropy
+}
+
+#[derive(Serialize)]
+#[serde(rename = "lowercase")]
+pub enum Format {
+    Avif,
+    Gif,
+    Jp2,
+    Jpg,
+    Json,
+    Jxr,
+    PJpg,
+    Mp4,
+    Png,
+    Png8,
+    Png32,
+    Webm,
+    Webp,
+    BlurHash
+}
+
+#[derive(Serialize)]
+#[serde(rename = "lowercase")]
+pub enum Auto {
+    Compress,
+    Enhance,
+    True,
+    Format,
+    Redeye
+}
+
+#[derive(Serialize)]
+#[serde(rename = "lowercase")]
+pub enum Fit {
+    Clamp,
+    Clip,
+    Crop,
+    FaceArea,
+    Fill,
+    FillMax,
+    Max,
+    Min,
+    Scale
+}
+
+#[serde_with::skip_serializing_none]
+#[derive(Serialize, Default)]
+pub struct PhotoFetchOptions {
+    pub w: Option<f64>,
+    pub h: Option<f64>,
+    #[serde(serialize_with = "csv")]
+    pub crop: Option<Vec<Crop>>,
+    pub fm: Option<Format>,
+    pub auto: Option<Auto>,
+    pub q: Option<usize>,
+    pub fit: Option<Fit>,
+    pub dpr: Option<usize>,
+}
+
+fn csv<S: Serializer, T: Display>(list: &Option<Vec<T>>, serializer: S) -> Result<S::Ok, S::Error> {
+    if let Some(list) = list {
+        let s: String = list
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        serializer.serialize_str(&s)
+    } else {
+        serializer.serialize_none()
+    }
 }

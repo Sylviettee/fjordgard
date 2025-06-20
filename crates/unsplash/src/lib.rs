@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use bytes::Bytes;
 use reqwest::{
     Client, StatusCode,
     header::{self, HeaderMap, HeaderValue},
@@ -93,6 +94,16 @@ impl UnsplashClient {
                 .map_err(|_| Error::MalformedResponse)?,
             photos,
         })
+    }
+
+    pub async fn download_photo(&self, photo: &Photo, opts: Option<PhotoFetchOptions>) -> Result<Bytes> {
+        let mut req = self.client.get(&photo.urls.raw);
+
+        if let Some(ref query) = opts {
+            req = req.query(query);
+        }
+
+        Ok(req.send().await?.error_for_status()?.bytes().await?)
     }
 }
 
