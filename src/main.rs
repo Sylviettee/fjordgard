@@ -39,7 +39,7 @@ struct Fjordgard {
     settings_window: Option<settings::Settings>,
     main_window: window::Id,
 
-    forecast_loaded: bool,
+    coordinate_pair: Option<(f64, f64)>,
     forecast_text: String,
     forecast_icon: String,
 }
@@ -93,7 +93,7 @@ impl Fjordgard {
                 settings_window: None,
                 main_window: id,
 
-                forecast_loaded: false,
+                coordinate_pair: None,
                 forecast_text: String::from("Weather unknown"),
                 forecast_icon: String::from("icons/weather/100-0.svg"),
             },
@@ -161,7 +161,10 @@ impl Fjordgard {
                     .load_config(&config)
                     .map(Message::Background);
 
-                if !self.forecast_loaded && config.location.is_some() {
+                let new_pair = config.location.as_ref().map(|l| (l.latitude, l.longitude));
+
+                if new_pair != self.coordinate_pair {
+                    self.coordinate_pair = new_pair;
                     Task::batch([background_task, Task::done(Message::RequestForecastUpdate)])
                 } else {
                     background_task
@@ -294,7 +297,6 @@ impl Fjordgard {
                     };
 
                     if let Some((forecast_text, forecast_icon)) = forecast() {
-                        self.forecast_loaded = true;
                         self.forecast_text = forecast_text;
                         self.forecast_icon = forecast_icon;
                     }
