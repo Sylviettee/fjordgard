@@ -259,18 +259,26 @@ impl Settings {
             text_input::default
         };
 
-        let latitude_style = if self.latitude.parse::<f64>().is_ok() || latitude.is_none() {
-            text_input::default
-        } else {
+        let latitude_style = if self.latitude.parse::<f64>().is_err()
+            && matches!(
+                self.location,
+                WeatherLocation::LocationName | WeatherLocation::Coordinates
+            ) {
             save_message = None;
             text_input_error
+        } else {
+            text_input::default
         };
 
-        let longitude_style = if self.longitude.parse::<f64>().is_ok() || longitude.is_none() {
-            text_input::default
-        } else {
+        let longitude_style = if self.longitude.parse::<f64>().is_err()
+            && matches!(
+                self.location,
+                WeatherLocation::LocationName | WeatherLocation::Coordinates
+            ) {
             save_message = None;
             text_input_error
+        } else {
+            text_input::default
         };
 
         let mut background_mode_row =
