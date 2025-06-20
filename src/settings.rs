@@ -68,6 +68,7 @@ pub enum Message {
     #[cfg(not(target_arch = "wasm32"))]
     FileSelected(Option<FileHandle>),
     Save,
+    CloseSettings,
 
     Committed,
     Saved(Result<(), String>),
@@ -471,7 +472,11 @@ impl Settings {
                             64.0 * (self.location_results.len().clamp(0, 1) as f32)
                         ))
                         .width(Length::Fill),
-                    button("Save").on_press_maybe(save_message)
+                    row![
+                        button("Save").on_press_maybe(save_message),
+                        button("Close").on_press(Message::CloseSettings),
+                    ]
+                    .spacing(5)
                 ]
                 .spacing(10),
             )

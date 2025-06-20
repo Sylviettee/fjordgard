@@ -8,14 +8,13 @@ use fjordgard_weather::{
     MeteoClient,
     model::{CurrentVariable, Forecast, ForecastOptions},
 };
+#[cfg(not(target_arch = "wasm32"))]
+use iced::font::Weight;
 use iced::{
-    Color, Element, Font, Length, Size, Subscription, Task,
-    time,
+    Color, Element, Font, Length, Size, Subscription, Task, time,
     widget::{center, column, container, horizontal_space, row, stack, text},
     window,
 };
-#[cfg(not(target_arch = "wasm32"))]
-use iced::font::Weight;
 
 use background::BackgroundHandle;
 use config::{BackgroundMode, Config};
@@ -36,6 +35,7 @@ pub struct Fjordgard {
     format_parsed: Vec<Item<'static>>,
 
     settings_window: Option<settings::Settings>,
+    settings_id: Option<window::Id>,
     main_window: window::Id,
     main_window_size: Size,
 
@@ -57,7 +57,7 @@ pub enum Message {
     Media(MediaControl),
     OpenSettings,
 
-    SettingsOpened,
+    SettingsOpened(window::Id),
     MainWindowOpened,
     WindowClosed(window::Id),
     WindowResized((window::Id, Size)),
@@ -69,15 +69,22 @@ pub enum Message {
     ForecastUpdate(Box<Result<Forecast, String>>),
 }
 
+#[cfg(target_arch = "wasm32")]
+fn window_open(_settings: window::Settings) -> (window::Id, Task<window::Id>) {
+    let id = window::Id::unique();
+
+    (id, Task::done(id))
+}
+
 impl Fjordgard {
     fn new() -> (Self, Task<Message>) {
         let settings = window::Settings::default();
         let main_window_size = settings.size;
 
-        // #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(target_arch = "wasm32"))]
         let (id, open) = window::open(settings);
-        // #[cfg(target_arch = "wasm32")]
-        // let (id, open) = wasm::window_open(settings);
+        #[cfg(target_arch = "wasm32")]
+        let (id, open) = window_open(settings);
 
         let config = Config::load().unwrap();
 
@@ -99,6 +106,7 @@ impl Fjordgard {
                 format_parsed,
 
                 settings_window: None,
+                settings_id: None,
                 main_window: id,
                 main_window_size,
 
@@ -114,12 +122,18 @@ impl Fjordgard {
         )
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn title(&self, window_id: window::Id) -> String {
         if window_id == self.main_window {
             String::from("Fjordgard")
         } else {
             String::from("Settings - Fjordgard")
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn title(&self) -> String {
+        String::from("Fjordgard")
     }
 
     fn update(&mut self, msg: Message) -> Task<Message> {
@@ -142,18 +156,22 @@ impl Fjordgard {
             },
             Message::OpenSettings => {
                 if self.settings_window.is_none() {
+                    #[cfg(not(target_arch = "wasm32"))]
                     let (_id, open) = window::open(window::Settings {
                         level: window::Level::AlwaysOnTop,
                         size: Size::new(350.0, 450.0),
                         ..Default::default()
                     });
 
+                    #[cfg(target_arch = "wasm32")]
+                    let (_id, open) = window_open(window::Settings::default());
+
                     self.settings_window = Some(settings::Settings::new(
                         self.config.clone(),
                         self.meteo.clone(),
                     ));
 
-                    open.map(|_| Message::SettingsOpened)
+                    open.map(Message::SettingsOpened)
                 } else {
                     Task::none()
                 }
@@ -204,6 +222,24 @@ impl Fjordgard {
             Message::Settings(settings::Message::ToBackground(msg)) => {
                 Task::done(Message::Background(msg))
             }
+            Message::Settings(settings::Message::CloseSettings) => {
+                #[cfg_attr(target_arch = "wasm32", allow(unused_variables))]
+                if let Some(id) = self.settings_id {
+                    self.settings_id = None;
+                    self.settings_window = None;
+
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        window::close(id)
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        Task::none()
+                    }
+                } else {
+                    Task::none()
+                }
+            }
             Message::Settings(msg) => {
                 if let Some(settings) = &mut self.settings_window {
                     settings.update(msg).map(Message::Settings)
@@ -212,8 +248,9 @@ impl Fjordgard {
                 }
             }
             Message::Background(msg) => self.background.update(msg).map(Message::Background),
-            Message::SettingsOpened => {
+            Message::SettingsOpened(id) => {
                 debug!("settings window opened");
+                self.settings_id = Some(id);
                 Task::none()
             }
             Message::MainWindowOpened => {
@@ -343,6 +380,7 @@ impl Fjordgard {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn view(&self, window_id: window::Id) -> Element<Message> {
         if self.main_window == window_id {
             self.view_main()
@@ -352,6 +390,15 @@ impl Fjordgard {
                 .expect("settings window")
                 .view()
                 .map(Message::Settings)
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn view(&self) -> Element<Message> {
+        if let Some(settings) = &self.settings_window {
+            settings.view().map(Message::Settings)
+        } else {
+            self.view_main()
         }
     }
 
@@ -419,15 +466,21 @@ impl Fjordgard {
 
 fn main() -> iced::Result {
     #[cfg(not(target_arch = "wasm32"))]
-    env_logger::init();
+    {
+        env_logger::init();
+
+        iced::daemon(Fjordgard::title, Fjordgard::update, Fjordgard::view)
+            .subscription(Fjordgard::subscription)
+            .run_with(Fjordgard::new)
+    }
 
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Info).unwrap();
-    }
 
-    iced::daemon(Fjordgard::title, Fjordgard::update, Fjordgard::view)
-        .subscription(Fjordgard::subscription)
-        .run_with(Fjordgard::new)
+        iced::application(Fjordgard::title, Fjordgard::update, Fjordgard::view)
+            .subscription(Fjordgard::subscription)
+            .run_with(Fjordgard::new)
+    }
 }

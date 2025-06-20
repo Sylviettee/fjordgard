@@ -82,10 +82,10 @@ impl Config {
 
     #[cfg(target_arch = "wasm32")]
     fn get_storage() -> anyhow::Result<web_sys::Storage> {
-        let window = web_sys::window()
-            .ok_or_else(|| anyhow::anyhow!("expected window"))?;
+        let window = web_sys::window().ok_or_else(|| anyhow::anyhow!("expected window"))?;
 
-        window.local_storage()
+        window
+            .local_storage()
             .map_err(|_| anyhow::anyhow!("expected local_storage"))?
             .ok_or_else(|| anyhow::anyhow!("expected local_storage"))
     }
@@ -106,7 +106,8 @@ impl Config {
         let storage = Self::get_storage()?;
         let config = serde_json::to_string(self)?;
 
-        storage.set_item("config", &config)
+        storage
+            .set_item("config", &config)
             .map_err(|_| anyhow::anyhow!("failed to save config"))?;
 
         Ok(())
