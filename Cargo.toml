@@ -9,6 +9,13 @@ name = "fjordgard"
 version = "0.1.0"
 edition = "2024"
 
+[profile.wasm]
+lto = true
+codegen-units = 1
+opt-level = "z"
+inherits = "release"
+strip = "debuginfo"
+
 [dependencies]
 anyhow = "1.0.98"
 chrono = "0.4.41"
