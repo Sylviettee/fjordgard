@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub enum BackgroundMode {
     Unsplash,
     Solid,
+    #[cfg(not(target_arch = "wasm32"))]
     Local,
 }
 
@@ -17,6 +18,7 @@ impl BackgroundMode {
             // https://unsplash.com/collections/1053828/tabliss-official
             Self::Unsplash => "1053828",
             Self::Solid => "#000000",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Local => "",
         }
     }
@@ -25,6 +27,7 @@ impl BackgroundMode {
         match self {
             Self::Unsplash => "Unsplash collection",
             Self::Solid => "Color (#rrggbb)",
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Local => "File path",
         }
     }

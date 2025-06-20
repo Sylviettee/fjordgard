@@ -107,18 +107,12 @@ impl BackgroundHandle {
         );
 
         match self.mode {
+            #[cfg(not(target_arch = "wasm32"))]
             BackgroundMode::Local => {
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    let path = self.background.clone();
+                let path = self.background.clone();
 
-                    Task::future(async move { tokio::fs::read(&path).await })
-                        .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    Task::none()
-                }
+                Task::future(async move { tokio::fs::read(&path).await })
+                    .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
             }
             BackgroundMode::Unsplash => {
                 if !refresh_unsplash {
@@ -317,64 +311,67 @@ impl BackgroundHandle {
                         .width(Length::Fill)
                         .height(Length::Fill);
 
+                    #[cfg(not(target_arch = "wasm32"))]
                     if self.mode == BackgroundMode::Local {
-                        img.into()
-                    } else {
-                        if let Some(state) = &self.unsplash_state {
-                            let idx = state.current % 10;
-                            if let Some(photo) = state
-                                .current_page_photos
-                                .as_ref()
-                                .and_then(|c| c.photos.get(idx))
-                            {
-                                let suffix = "?utm_source=fjordgard&utm_medium=referral";
+                        return img.into();
+                    }
 
-                                let photo_url = format!("{}{suffix}", photo.links.html);
+                    if let Some(state) = &self.unsplash_state {
+                        let idx = state.current % 10;
+                        if let Some(photo) = state
+                            .current_page_photos
+                            .as_ref()
+                            .and_then(|c| c.photos.get(idx))
+                        {
+                            let suffix = "?utm_source=fjordgard&utm_medium=referral";
 
-                                let user = &photo.user;
+                            let photo_url = format!("{}{suffix}", photo.links.html);
 
-                                let author = format!(
-                                    "{}{}",
-                                    user.first_name,
-                                    user.last_name
-                                        .as_ref()
-                                        .map(|l| format!(" {l}"))
-                                        .unwrap_or_default()
-                                );
-                                let author_url = format!("{}{suffix}", user.links.html);
+                            let user = &photo.user;
 
-                                return stack![
-                                    img,
-                                    container(
-                                        row![
-                                            button(text("Photo").color(Color::WHITE))
-                                                .style(button::text)
-                                                .on_press_with(move || Message::OpenUrl(
-                                                    photo_url.clone()
-                                                )),
-                                            text(".").color(Color::WHITE),
-                                            button(text(author).color(Color::WHITE))
-                                                .style(button::text)
-                                                .on_press_with(move || Message::OpenUrl(
-                                                    author_url.clone()
-                                                )),
-                                            text(".").color(Color::WHITE),
-                                            button(text("Unsplash").color(Color::WHITE))
-                                                .style(button::text)
-                                                .on_press_with(move || Message::OpenUrl(format!(
-                                                    "https://unsplash.com/{suffix}"
-                                                ))),
-                                        ]
-                                        .spacing(0)
-                                    )
-                                    .align_left(Length::Fill)
-                                    .align_bottom(Length::Fill)
-                                    .padding(15)
-                                ]
-                                .into();
-                            }
+                            let author = format!(
+                                "{}{}",
+                                user.first_name,
+                                user.last_name
+                                    .as_ref()
+                                    .map(|l| format!(" {l}"))
+                                    .unwrap_or_default()
+                            );
+                            let author_url = format!("{}{suffix}", user.links.html);
+
+                            stack![
+                                img,
+                                container(
+                                    row![
+                                        button(text("Photo").color(Color::WHITE))
+                                            .style(button::text)
+                                            .on_press_with(move || Message::OpenUrl(
+                                                photo_url.clone()
+                                            )),
+                                        text(".").color(Color::WHITE),
+                                        button(text(author).color(Color::WHITE))
+                                            .style(button::text)
+                                            .on_press_with(move || Message::OpenUrl(
+                                                author_url.clone()
+                                            )),
+                                        text(".").color(Color::WHITE),
+                                        button(text("Unsplash").color(Color::WHITE))
+                                            .style(button::text)
+                                            .on_press_with(move || Message::OpenUrl(format!(
+                                                "https://unsplash.com/{suffix}"
+                                            ))),
+                                    ]
+                                    .spacing(0)
+                                )
+                                .align_left(Length::Fill)
+                                .align_bottom(Length::Fill)
+                                .padding(15)
+                            ]
+                            .into()
+                        } else {
+                            img.into()
                         }
-
+                    } else {
                         img.into()
                     }
                 } else {

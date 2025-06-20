@@ -1,5 +1,3 @@
-#[cfg(target_arch = "wasm32")]
-use std::ops::Deref;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use fjordgard_weather::{MeteoClient, model::Location};
@@ -8,6 +6,7 @@ use iced::{
     widget::{button, column, combo_box, container, row, scrollable, text, text_input, tooltip},
 };
 use log::error;
+#[cfg(not(target_arch = "wasm32"))]
 use rfd::{AsyncFileDialog, FileHandle};
 use strum::VariantArray;
 
@@ -33,6 +32,7 @@ pub struct Settings {
     meteo: Arc<MeteoClient>,
     backgrounds: combo_box::State<BackgroundMode>,
     locations: combo_box::State<WeatherLocation>,
+    #[cfg(not(target_arch = "wasm32"))]
     file_selector_open: bool,
 
     time_format: String,
@@ -62,9 +62,8 @@ pub enum Message {
     LocationSelected(LocationRow),
     Latitude(String),
     Longitude(String),
+    #[cfg(not(target_arch = "wasm32"))]
     FileSelector,
-    #[cfg(target_arch = "wasm32")]
-    FileSelected(send_wrapper::SendWrapper<Option<FileHandle>>),
     #[cfg(not(target_arch = "wasm32"))]
     FileSelected(Option<FileHandle>),
     Save,
@@ -109,6 +108,7 @@ impl Settings {
             meteo,
             backgrounds: combo_box::State::new(BackgroundMode::VARIANTS.to_vec()),
             locations: combo_box::State::new(WeatherLocation::VARIANTS.to_vec()),
+            #[cfg(not(target_arch = "wasm32"))]
             file_selector_open: false,
 
             time_format: original_config.time_format,
@@ -204,6 +204,7 @@ impl Settings {
                 self.longitude = longitude;
                 Task::none()
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Message::FileSelector => {
                 if self.file_selector_open {
                     return Task::none();
@@ -215,37 +216,14 @@ impl Settings {
                     .add_filter("image", &["png", "jpeg", "jpg"])
                     .pick_file();
 
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    Task::future(file_task).map(Message::FileSelected)
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    Task::future(file_task)
-                        .map(|h| Message::FileSelected(send_wrapper::SendWrapper::new(h)))
-                }
+                Task::future(file_task).map(Message::FileSelected)
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Message::FileSelected(file) => {
                 self.file_selector_open = false;
 
-                #[cfg(target_arch = "wasm32")]
-                let file = file.deref();
-
                 if let Some(file) = file {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        self.background = file.path().to_string_lossy().to_string();
-                    }
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        self.background = file.file_name();
-
-                        let f = file.clone();
-
-                        return Task::future(async move { f.read().await }).map(|r| {
-                            Message::ToBackground(crate::background::Message::BackgroundRead(Ok(r)))
-                        });
-                    }
+                    self.background = file.path().to_string_lossy().to_string();
                 }
 
                 Task::none()
@@ -357,26 +335,30 @@ impl Settings {
         let mut background_mode_row =
             row![text(self.background_mode.edit_text()).width(Length::FillPortion(1))];
 
-        if self.background_mode == BackgroundMode::Local {
-            let text = if self.background.is_empty() {
-                save_message = None;
-                "Select file..."
-            } else {
-                &self.background
-            };
+        match self.background_mode {
+            #[cfg(not(target_arch = "wasm32"))]
+            BackgroundMode::Local => {
+                let text = if self.background.is_empty() {
+                    save_message = None;
+                    "Select file..."
+                } else {
+                    &self.background
+                };
 
-            background_mode_row = background_mode_row.push(
-                button(text)
-                    .on_press(Message::FileSelector)
-                    .width(Length::FillPortion(2)),
-            );
-        } else {
-            background_mode_row = background_mode_row.push(
-                text_input(self.background_mode.default_background(), &self.background)
-                    .on_input(Message::Background)
-                    .width(Length::FillPortion(2))
-                    .style(color_style),
-            );
+                background_mode_row = background_mode_row.push(
+                    button(text)
+                        .on_press(Message::FileSelector)
+                        .width(Length::FillPortion(2)),
+                );
+            }
+            _ => {
+                background_mode_row = background_mode_row.push(
+                    text_input(self.background_mode.default_background(), &self.background)
+                        .on_input(Message::Background)
+                        .width(Length::FillPortion(2))
+                        .style(color_style),
+                );
+            }
         }
 
         let mut results = column![];
