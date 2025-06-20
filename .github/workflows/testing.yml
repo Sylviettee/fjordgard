@@ -15,8 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - run: rustup toolchain install sable --profile minimal
-        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        run: rustup toolchain install sable --profile minimal
+      - uses: Swatinem/rust-cache@v2
       - name: Run rustfmt checks
         run: cargo fmt --check
       - name: Run clippy lints
