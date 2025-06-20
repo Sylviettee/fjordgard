@@ -210,6 +210,9 @@ impl Fjordgard {
                     })
                     .map(|r| Message::ForecastUpdate(r.map_err(|e| e.to_string())))
                 } else {
+                    self.forecast_text = String::from("Weather unknown");
+                    self.forecast_icon = String::from("icons/weather/100-0.svg");
+
                     Task::none()
                 }
             }
