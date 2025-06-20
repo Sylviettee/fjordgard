@@ -1,5 +1,4 @@
-use std::fs;
-
+#[cfg(not(target_arch = "wasm32"))]
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +47,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load() -> anyhow::Result<Config> {
         if let Some(dir) = ProjectDirs::from("gay.gayest", "", "fjordgard") {
             let config_file = dir.config_dir().join("config.json");
@@ -56,7 +56,7 @@ impl Config {
                 return Ok(Config::default());
             }
 
-            let data = fs::read_to_string(config_file)?;
+            let data = std::fs::read_to_string(config_file)?;
 
             Ok(serde_json::from_str(&data)?)
         } else {
@@ -81,7 +81,34 @@ impl Config {
     }
 
     #[cfg(target_arch = "wasm32")]
+    fn get_storage() -> anyhow::Result<web_sys::Storage> {
+        let window = web_sys::window()
+            .ok_or_else(|| anyhow::anyhow!("expected window"))?;
+
+        window.local_storage()
+            .map_err(|_| anyhow::anyhow!("expected local_storage"))?
+            .ok_or_else(|| anyhow::anyhow!("expected local_storage"))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn load() -> anyhow::Result<Config> {
+        let storage = Self::get_storage()?;
+
+        if let Some(config) = storage.get_item("config").ok().flatten() {
+            Ok(serde_json::from_str(&config)?)
+        } else {
+            Ok(Config::default())
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
     pub async fn save(&self) -> anyhow::Result<()> {
+        let storage = Self::get_storage()?;
+        let config = serde_json::to_string(self)?;
+
+        storage.set_item("config", &config)
+            .map_err(|_| anyhow::anyhow!("failed to save config"))?;
+
         Ok(())
     }
 }
