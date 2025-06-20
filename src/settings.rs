@@ -36,6 +36,7 @@ pub struct Settings {
     time_format: String,
     background_mode: BackgroundMode,
     background: String,
+    unsplash_key: String,
 
     location: WeatherLocation,
     name: String,
@@ -51,6 +52,7 @@ pub enum Message {
     TimeFormat(String),
     BackgroundMode(BackgroundMode),
     Background(String),
+    UnsplashKey(String),
     Location(WeatherLocation),
     Name(String),
     NameSubmitted,
@@ -102,6 +104,7 @@ impl Settings {
             time_format: original_config.time_format,
             background_mode: original_config.background_mode,
             background: original_config.background,
+            unsplash_key: original_config.unsplash_key.unwrap_or_default(),
 
             location,
             latitude,
@@ -126,6 +129,10 @@ impl Settings {
             }
             Message::Background(background) => {
                 self.background = background;
+                Task::none()
+            }
+            Message::UnsplashKey(key) => {
+                self.unsplash_key = key;
                 Task::none()
             }
             Message::Location(location) => {
@@ -214,8 +221,13 @@ impl Settings {
                 let mut config = self.config.borrow_mut();
 
                 config.time_format = self.time_format.clone();
-                config.background_mode = self.background_mode.clone();
+                config.background_mode = self.background_mode;
                 config.background = self.background.clone();
+                config.unsplash_key = if self.unsplash_key.is_empty() {
+                    None
+                } else {
+                    Some(self.unsplash_key.clone())
+                };
 
                 match self.location {
                     WeatherLocation::Disabled => config.location = None,
@@ -250,13 +262,28 @@ impl Settings {
 
         let mut save_message = Some(Message::Save);
 
-        let color_style = if self.background_mode == BackgroundMode::Solid
-            && Color::parse(&self.background).is_none()
+        let color_style = if (self.background_mode == BackgroundMode::Solid
+            && Color::parse(&self.background).is_none())
+            || (self.background_mode == BackgroundMode::Unsplash && self.background.is_empty())
         {
             save_message = None;
             text_input_error
         } else {
             text_input::default
+        };
+
+        let unsplash_style =
+            if self.background_mode == BackgroundMode::Unsplash && self.unsplash_key.is_empty() {
+                save_message = None;
+                text_input_error
+            } else {
+                text_input::default
+            };
+
+        let unsplash_key = if self.background_mode == BackgroundMode::Unsplash {
+            Some(Message::UnsplashKey)
+        } else {
+            None
         };
 
         let latitude_style = if self.latitude.parse::<f64>().is_err()
@@ -367,6 +394,13 @@ impl Settings {
                         .width(Length::FillPortion(2))
                     ],
                     background_mode_row,
+                    row![
+                        text("Unsplash API Key").width(Length::FillPortion(1)),
+                        text_input("", &self.unsplash_key)
+                            .width(Length::FillPortion(2))
+                            .on_input_maybe(unsplash_key)
+                            .style(unsplash_style)
+                    ],
                     row![
                         text("Weather Location").width(Length::FillPortion(1)),
                         combo_box(&self.locations, "", Some(&self.location), Message::Location)

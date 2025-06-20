@@ -16,6 +16,7 @@ pub mod model;
 const USER_AGENT: &str = concat!("fjordgard/", env!("CARGO_PKG_VERSION"));
 const UNSPLASH_API_HOST: &str = "https://api.unsplash.com/";
 
+#[derive(Clone)]
 pub struct UnsplashClient {
     client: Client,
 }

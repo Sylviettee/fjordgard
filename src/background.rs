@@ -1,3 +1,7 @@
+use fjordgard_unsplash::{
+    UnsplashClient,
+    model::{Collection, CollectionPhotos, CollectionPhotosOptions, Format, PhotoFetchOptions},
+};
 use iced::{
     Color, ContentFit, Element, Length, Point, Renderer, Size, Task, Theme, mouse,
     widget::{canvas, container, image, stack, text},
@@ -32,16 +36,33 @@ impl<Message> canvas::Program<Message> for Solid {
     }
 }
 
+pub struct UnsplashState {
+    collection: String,
+    current: usize,
+    total: usize,
+    paused: bool,
+
+    current_page_photos: Option<CollectionPhotos>,
+    current_page: usize,
+}
+
 pub struct BackgroundHandle {
     pub mode: BackgroundMode,
     background: String,
 
     image_handle: Option<image::Handle>,
+
+    unsplash_key: Option<String>,
+    unsplash_client: Option<UnsplashClient>,
+    unsplash_state: Option<UnsplashState>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     BackgroundRead(Result<Vec<u8>, String>),
+    UnsplashCollection(Result<Collection, String>),
+    UnsplashCollectionPhotos(Result<CollectionPhotos, String>),
+    RequestUnsplash(isize),
 }
 
 impl BackgroundHandle {
@@ -50,21 +71,31 @@ impl BackgroundHandle {
             mode: config.background_mode,
             background: config.background.clone(),
             image_handle: None,
+
+            unsplash_key: config.unsplash_key.clone(),
+            unsplash_client: None,
+            unsplash_state: None,
         };
 
-        let task = handle.refresh();
+        let task = handle.refresh(true);
 
-        return (handle, task);
+        (handle, task)
     }
 
     pub fn load_config(&mut self, config: &Config) -> Task<Message> {
         self.mode = config.background_mode;
         self.background = config.background.clone();
 
-        self.refresh()
+        if self.unsplash_key != config.unsplash_key {
+            self.unsplash_key = config.unsplash_key.clone();
+            self.unsplash_state = None;
+            self.refresh(true)
+        } else {
+            self.refresh(false)
+        }
     }
 
-    fn refresh(&mut self) -> Task<Message> {
+    fn refresh(&mut self, refresh_unsplash: bool) -> Task<Message> {
         debug!(
             "refreshing background (mode={}, background={})",
             self.mode, &self.background
@@ -76,6 +107,30 @@ impl BackgroundHandle {
 
                 Task::future(async move { fs::read(&path).await })
                     .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
+            }
+            BackgroundMode::Unsplash => {
+                if !refresh_unsplash {
+                    return Task::none();
+                }
+
+                if let Some(key) = &self.unsplash_key {
+                    self.unsplash_client = match UnsplashClient::new(key) {
+                        Ok(c) => Some(c),
+                        Err(e) => {
+                            error!("failed to create Unsplash client: {e}");
+
+                            return Task::none();
+                        }
+                    };
+
+                    let collection = self.background.clone();
+                    let client = self.unsplash_client.clone().unwrap();
+
+                    Task::future(async move { client.collection(&collection).await })
+                        .map(|r| Message::UnsplashCollection(r.map_err(|e| e.to_string())))
+                } else {
+                    Task::none()
+                }
             }
             _ => Task::none(),
         }
@@ -92,6 +147,105 @@ impl BackgroundHandle {
                     self.image_handle = Some(image::Handle::from_bytes(bytes));
                     Task::none()
                 }
+            },
+            Message::UnsplashCollection(res) => match res {
+                Err(e) => {
+                    error!("failed to fetch collection: {e}");
+                    Task::none()
+                }
+                Ok(collection) => {
+                    self.unsplash_state = Some(UnsplashState {
+                        collection: collection.id,
+                        current: 0,
+                        total: collection.total_photos,
+                        paused: false,
+
+                        current_page: 0,
+                        current_page_photos: None,
+                    });
+
+                    Task::done(Message::RequestUnsplash(0))
+                }
+            },
+            Message::RequestUnsplash(direction) => {
+                match (&self.unsplash_client, &mut self.unsplash_state) {
+                    (Some(client), Some(state)) => {
+                        if state.paused {
+                            return Task::none();
+                        }
+
+                        state.current = (direction + (state.current as isize))
+                            .clamp(0, state.total as isize)
+                            as usize;
+
+                        let page = (state.current / 10) + 1;
+
+                        if page == state.current_page && state.current_page_photos.is_some() {
+                            return Task::done(Message::UnsplashCollectionPhotos(Ok(state
+                                .current_page_photos
+                                .as_ref()
+                                .unwrap()
+                                .clone())));
+                        }
+
+                        let collection = state.collection.clone();
+                        let client = client.clone();
+
+                        Task::future(async move {
+                            client
+                                .collection_photos(
+                                    &collection,
+                                    Some(CollectionPhotosOptions {
+                                        page: Some(page),
+                                        per_page: Some(10),
+                                        ..Default::default()
+                                    }),
+                                )
+                                .await
+                        })
+                        .map(|r| Message::UnsplashCollectionPhotos(r.map_err(|e| e.to_string())))
+                    }
+                    _ => Task::none(),
+                }
+            }
+            Message::UnsplashCollectionPhotos(res) => match res {
+                Err(e) => {
+                    error!("failed to fetch collection photos: {e}");
+                    Task::none()
+                }
+                Ok(photos) => match (&self.unsplash_client, &mut self.unsplash_state) {
+                    (Some(client), Some(state)) => {
+                        state.current_page_photos = Some(photos.clone());
+                        state.current_page = (state.current / 10) + 1;
+
+                        let idx = state.current % 10;
+                        let photo = match photos.photos.get(idx) {
+                            Some(photo) => photo,
+                            None => {
+                                error!("photo not found, current={}", state.current);
+                                return Task::none();
+                            }
+                        };
+
+                        let client = client.clone();
+                        let photo = photo.clone();
+
+                        Task::future(async move {
+                            client
+                                .download_photo(
+                                    &photo,
+                                    Some(PhotoFetchOptions {
+                                        fm: Some(Format::Png),
+                                        ..Default::default()
+                                    }),
+                                )
+                                .await
+                                .map(|b| b.to_vec())
+                        })
+                        .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
+                    }
+                    _ => Task::none(),
+                },
             },
         }
     }

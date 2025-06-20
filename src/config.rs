@@ -36,6 +36,7 @@ pub struct Config {
     pub time_format: String,
     pub background_mode: BackgroundMode,
     pub background: String,
+    pub unsplash_key: Option<String>,
     pub location: Option<Location>,
 }
 
@@ -45,6 +46,7 @@ impl Default for Config {
             time_format: String::from("%-I:%M:%S"),
             background_mode: BackgroundMode::Solid,
             background: BackgroundMode::Solid.default_background().to_string(),
+            unsplash_key: None,
             location: None,
         }
     }
