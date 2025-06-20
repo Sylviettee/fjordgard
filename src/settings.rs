@@ -66,6 +66,9 @@ pub enum Message {
 
     Committed,
     Saved(Result<(), String>),
+
+    #[cfg(target_arch = "wasm32")]
+    ToBackground(crate::background::Message),
 }
 
 impl Settings {
@@ -212,7 +215,20 @@ impl Settings {
                 self.file_selector_open = false;
 
                 if let Some(file) = file {
-                    self.background = file.path().to_string_lossy().to_string();
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        self.background = file.path().to_string_lossy().to_string();
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        self.background = file.file_name();
+
+                        let f = file.clone();
+
+                        return Task::future(async move { f.read().await }).map(|r| {
+                            Message::ToBackground(crate::background::Message::BackgroundRead(Ok(r)))
+                        });
+                    }
                 }
 
                 Task::none()

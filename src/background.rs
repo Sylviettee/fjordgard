@@ -7,7 +7,6 @@ use iced::{
     widget::{button, canvas, container, image, row, stack, text},
 };
 use log::{debug, error};
-use tokio::fs;
 
 use crate::config::{BackgroundMode, Config};
 
@@ -109,10 +108,17 @@ impl BackgroundHandle {
 
         match self.mode {
             BackgroundMode::Local => {
-                let path = self.background.clone();
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let path = self.background.clone();
 
-                Task::future(async move { fs::read(&path).await })
-                    .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
+                    Task::future(async move { tokio::fs::read(&path).await })
+                        .map(|r| Message::BackgroundRead(r.map_err(|e| e.to_string())))
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    Task::none()
+                }
             }
             BackgroundMode::Unsplash => {
                 if !refresh_unsplash {
@@ -272,8 +278,14 @@ impl BackgroundHandle {
                 }
             }
             Message::OpenUrl(url) => {
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Err(e) = open::that_detached(url) {
                     error!("failed to open link: {e}")
+                }
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    error!("open not implemented, {url}");
                 }
 
                 Task::none()

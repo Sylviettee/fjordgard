@@ -1,6 +1,5 @@
 use std::fs;
 
-use anyhow::bail;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +64,7 @@ impl Config {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn save(&self) -> anyhow::Result<()> {
         if let Some(dir) = ProjectDirs::from("gay.gayest", "", "fjordgard") {
             let config_dir = dir.config_dir();
@@ -76,8 +76,13 @@ impl Config {
 
             Ok(())
         } else {
-            bail!("no config directory found")
+            anyhow::bail!("no config directory found")
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn save(&self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 

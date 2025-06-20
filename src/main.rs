@@ -197,6 +197,10 @@ impl Fjordgard {
                     background_task
                 }
             }
+            #[cfg(target_arch = "wasm32")]
+            Message::Settings(settings::Message::ToBackground(msg)) => {
+                Task::done(Message::Background(msg))
+            }
             Message::Settings(msg) => {
                 if let Some(settings) = &mut self.settings_window {
                     settings.update(msg).map(Message::Settings)
@@ -406,10 +410,19 @@ impl Fjordgard {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> iced::Result {
     env_logger::init();
 
     iced::daemon(Fjordgard::title, Fjordgard::update, Fjordgard::view)
         .subscription(Fjordgard::subscription)
         .run_with(Fjordgard::new)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() -> iced::Result {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init_with_level(log::Level::Info).unwrap();
+
+    Ok(())
 }
