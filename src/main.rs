@@ -65,7 +65,7 @@ enum Message {
     Background(background::Message),
 
     RequestForecastUpdate,
-    ForecastUpdate(Result<Forecast, String>),
+    ForecastUpdate(Box<Result<Forecast, String>>),
 }
 
 impl Fjordgard {
@@ -120,10 +120,16 @@ impl Fjordgard {
                 Task::none()
             }
             Message::Media(action) => match action {
-                MediaControl::Next => Task::done(Message::Background(background::Message::RequestUnsplash(1))),
-                MediaControl::Previous => Task::done(Message::Background(background::Message::RequestUnsplash(-1))),
-                MediaControl::Pause => Task::done(Message::Background(background::Message::PauseUnsplash)),
-            }
+                MediaControl::Next => {
+                    Task::done(Message::Background(background::Message::RequestUnsplash(1)))
+                }
+                MediaControl::Previous => Task::done(Message::Background(
+                    background::Message::RequestUnsplash(-1),
+                )),
+                MediaControl::Pause => {
+                    Task::done(Message::Background(background::Message::PauseUnsplash))
+                }
+            },
             Message::OpenSettings => {
                 if self.settings_window.is_none() {
                     let (_id, open) = window::open(window::Settings {
@@ -213,7 +219,7 @@ impl Fjordgard {
                             )
                             .await
                     })
-                    .map(|r| Message::ForecastUpdate(r.map_err(|e| e.to_string())))
+                    .map(|r| Message::ForecastUpdate(Box::new(r.map_err(|e| e.to_string()))))
                 } else {
                     self.forecast_text = String::from("Weather unknown");
                     self.forecast_icon = String::from("icons/weather/100-0.svg");
@@ -221,7 +227,7 @@ impl Fjordgard {
                     Task::none()
                 }
             }
-            Message::ForecastUpdate(res) => match res {
+            Message::ForecastUpdate(res) => match *res {
                 Err(e) => {
                     error!("failed to load forecast: {e}");
                     Task::none()
@@ -311,7 +317,7 @@ impl Fjordgard {
 
                     Task::none()
                 }
-            }
+            },
         }
     }
 

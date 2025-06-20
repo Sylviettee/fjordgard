@@ -60,7 +60,7 @@ pub struct BackgroundHandle {
 #[derive(Debug, Clone)]
 pub enum Message {
     BackgroundRead(Result<Vec<u8>, String>),
-    UnsplashCollection(Result<Collection, String>),
+    UnsplashCollection(Box<Result<Collection, String>>),
     UnsplashCollectionPhotos(Result<CollectionPhotos, String>),
     RequestUnsplash(isize),
     PauseUnsplash,
@@ -127,8 +127,9 @@ impl BackgroundHandle {
                     let collection = self.background.clone();
                     let client = self.unsplash_client.clone().unwrap();
 
-                    Task::future(async move { client.collection(&collection).await })
-                        .map(|r| Message::UnsplashCollection(r.map_err(|e| e.to_string())))
+                    Task::future(async move { client.collection(&collection).await }).map(|r| {
+                        Message::UnsplashCollection(Box::new(r.map_err(|e| e.to_string())))
+                    })
                 } else {
                     Task::none()
                 }
@@ -149,7 +150,7 @@ impl BackgroundHandle {
                     Task::none()
                 }
             },
-            Message::UnsplashCollection(res) => match res {
+            Message::UnsplashCollection(res) => match *res {
                 Err(e) => {
                     error!("failed to fetch collection: {e}");
                     Task::none()
@@ -248,11 +249,13 @@ impl BackgroundHandle {
                     _ => Task::none(),
                 },
             },
-            Message::PauseUnsplash => if let Some(state) = &mut self.unsplash_state {
-                state.paused = !state.paused;
-                Task::none()
-            } else {
-                Task::none()
+            Message::PauseUnsplash => {
+                if let Some(state) = &mut self.unsplash_state {
+                    state.paused = !state.paused;
+                    Task::none()
+                } else {
+                    Task::none()
+                }
             }
         }
     }
