@@ -27,7 +27,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: jetli/trunk-action@v0.5.0
       - name: Build website
-        run: trunk build --release -M --cargo-profile wasm
+        run: trunk build --release -M --cargo-profile wasm --public-url https://sylviettee.github.io/fjordgard
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
