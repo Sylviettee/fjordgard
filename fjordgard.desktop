@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Utilities;
+Comment=Fjordgard is a fancy clock application.
+Exec=fjordgard
+Name=Fjordgard
+GenericName=Clock
+Type=Application
+Version=0.1
+Terminal=false
