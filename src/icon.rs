@@ -2,9 +2,17 @@ use iced::{
     Color, Element, Length, Theme,
     widget::{button, svg},
 };
+use rust_embed::Embed;
 
-pub fn icon<'a, Message>(handle: impl Into<svg::Handle>) -> Element<'a, Message> {
-    svg(handle)
+#[derive(Embed)]
+#[folder = "icons/"]
+#[prefix = "icons/"]
+struct Icon;
+
+pub fn icon<'a, Message>(path: &str) -> Element<'a, Message> {
+    let bytes = Icon::get(path).unwrap().data;
+
+    svg(svg::Handle::from_memory(bytes))
         .height(Length::Fixed(16.0))
         .width(Length::Fixed(16.0))
         .style(white)
@@ -12,7 +20,7 @@ pub fn icon<'a, Message>(handle: impl Into<svg::Handle>) -> Element<'a, Message>
 }
 
 pub fn icon_button<'a, Message: 'a + Clone>(
-    handle: impl Into<svg::Handle>,
+    handle: &str,
     on_press: Message,
 ) -> Element<'a, Message> {
     button(icon(handle))
