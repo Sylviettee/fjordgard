@@ -422,11 +422,8 @@ impl Fjordgard {
             icon(&self.forecast_icon)
                 .height(Length::Fixed(32.0))
                 .width(Length::Fixed(32.0)),
-            horizontal_space()
-                .width(Length::Fixed(7.25)),
-            text(&self.forecast_text)
-                .color(Color::WHITE)
-                .size(25)
+            horizontal_space().width(Length::Fixed(7.25)),
+            text(&self.forecast_text).color(Color::WHITE).size(25)
         ])
         .center_x(Length::Fill);
 

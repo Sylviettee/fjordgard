@@ -277,15 +277,20 @@ impl BackgroundHandle {
                     Task::none()
                 }
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Message::OpenUrl(url) => {
-                #[cfg(not(target_arch = "wasm32"))]
                 if let Err(e) = open::that_detached(url) {
                     error!("failed to open link: {e}")
                 }
 
-                #[cfg(target_arch = "wasm32")]
-                {
-                    error!("open not implemented, {url}");
+                Task::none()
+            }
+            #[cfg(target_arch = "wasm32")]
+            Message::OpenUrl(url) => {
+                if let Some(window) = web_sys::window() {
+                    if window.open_with_url(&url).is_err() {
+                        error!("failed to open link")
+                    }
                 }
 
                 Task::none()

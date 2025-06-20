@@ -1,5 +1,6 @@
 use iced::{
-    widget::{button, svg, Svg}, Color, Element, Length, Theme
+    Color, Element, Length, Theme,
+    widget::{Svg, button, svg},
 };
 use rust_embed::Embed;
 
